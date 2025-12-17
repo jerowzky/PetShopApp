@@ -1,24 +1,31 @@
-# =============================
-# Pet Shop Management System
-# =============================
-
-packages <- c("shiny", "DBI", "RMariaDB", "DT", "dplyr", "base64enc", "shinyFeedback", "shinyjs")
-for (pkg in packages) {
-  if (!require(pkg, character.only = TRUE)) install.packages(pkg, dependencies = TRUE)
-}
-
-library(shiny)
-library(DBI)
-library(RMariaDB)
-library(DT)
-library(dplyr)
-library(base64enc)
-library(shinyFeedback)
-library(shinyjs)
+source("packages.R")
 
 
 # --- MySQL connection ---
-db <- dbConnect( RMariaDB::MariaDB(), user = "root", password = "", host = "127.0.0.1", dbname = "mypetshop_db" )
+db <- dbConnect(RSQLite::SQLite(), "mypetshop.sqlite")
+
+dbExecute(db, "
+CREATE TABLE IF NOT EXISTS pets (
+  id INTEGER PRIMARY KEY,
+  name TEXT,
+  type TEXT,
+  age INTEGER,
+  gender TEXT,
+  price REAL,
+  status TEXT
+)
+")
+
+# Create 'pet_additional_infos' table
+dbExecute(db, "
+CREATE TABLE IF NOT EXISTS pet_additional_infos (
+  pet_id INTEGER PRIMARY KEY,
+  breed TEXT DEFAULT 'N/A',
+  image TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY(pet_id) REFERENCES pets(id) ON DELETE CASCADE
+)
+")
 
 
 # ================= UI =================
@@ -1453,12 +1460,12 @@ observe({
                   )
         )
         
-        pet_id <- dbGetQuery(db, "SELECT LAST_INSERT_ID() AS id")$id[1]
+        pet_id <- dbGetQuery(db, "SELECT last_insert_rowid() AS id")$id[1]
         
         # Insert into additional infos table
         dbExecute(db,
                   "INSERT INTO pet_additional_infos (pet_id, breed, image, created_at)
-                 VALUES (?, ?, ?, NOW())",
+                  VALUES (?, ?, ?, datetime('now'))",
                   params = list(pet_id, breed_value, img_filename)
         )
         
@@ -1527,11 +1534,27 @@ observe({
   
   observeEvent(input$confirm_delete, {
     req(input$delete_id)
-    dbExecute(db, "DELETE FROM pets WHERE id = ?", params = list(input$delete_id))
-    removeModal()
-    loadPets()
-    loadPetAdditionalInfos()
+    
+    tryCatch({
+      # Delete the additional info row first
+      dbExecute(db, "DELETE FROM pet_additional_infos WHERE pet_id = ?", params = list(input$delete_id))
+      
+      # Delete the pet
+      dbExecute(db, "DELETE FROM pets WHERE id = ?", params = list(input$delete_id))
+      
+      removeModal()
+      
+      # Refresh data
+      loadPets()
+      loadPetAdditionalInfos()
+      
+      showNotification("Pet deleted successfully!", type = "message")
+      
+    }, error = function(e) {
+      showNotification(paste("Error deleting pet:", e$message), type = "error")
+    })
   })
+  
   
 }
 
