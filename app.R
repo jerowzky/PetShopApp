@@ -1,0 +1,1561 @@
+source("packages.R")
+
+
+# --- MySQL connection ---
+db <- dbConnect(RSQLite::SQLite(), "mypetshop.sqlite")
+
+dbExecute(db, "
+CREATE TABLE IF NOT EXISTS pets (
+  id INTEGER PRIMARY KEY,
+  name TEXT,
+  type TEXT,
+  age INTEGER,
+  gender TEXT,
+  price REAL,
+  status TEXT
+)
+")
+
+# Create 'pet_additional_infos' table
+dbExecute(db, "
+CREATE TABLE IF NOT EXISTS pet_additional_infos (
+  pet_id INTEGER PRIMARY KEY,
+  breed TEXT DEFAULT 'N/A',
+  image TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY(pet_id) REFERENCES pets(id) ON DELETE CASCADE
+)
+")
+
+
+# ================= UI =================
+ui <- fluidPage(
+  useShinyFeedback(),
+  useShinyjs(),
+  tags$head(
+    tags$link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css"),
+    tags$script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"),
+    
+    tags$style(HTML("
+  .stat-box {
+    background: #ffc629;
+    padding: 25px;
+    border-radius: 10px;
+    text-align: center;
+    color: white;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+    margin-bottom: 20px;
+  }
+
+  .stat-number {
+    font-size: 40px;
+    font-weight: bold;
+  }
+
+  .stat-label {
+    letter-spacing: 1px;
+    font-size: 14px;
+  }
+
+  @font-face {
+    font-family: 'SuperAdorable';
+    src: url('SuperAdorable.ttf') format('truetype');
+  }
+
+  @font-face {
+    font-family: 'Poppins';
+    src: url('Poppins.ttf') format('truetype');
+  }
+
+  @font-face {
+    font-family: 'PMedium';
+    src: url('PoppinsMedium.ttf') format('truetype');
+  }
+
+  @font-face {
+    font-family: 'PSemiBold';
+    src: url('PoppinsSemibold.ttf') format('truetype');
+  }
+  
+  @font-face {
+    font-family: 'PBold';
+    src: url('PoppinsBold.ttf') format('truetype');
+  }
+  
+  @font-face {
+    font-family: 'EpicPro';
+    src: url('EpicPro.ttf') format('truetype');
+  }
+  
+   @font-face {
+    font-family: 'FearRobot';
+    src: url('FearRobot.otf') format('truetype');
+  }
+  
+  @font-face {
+    font-family: 'PExBold';
+    src: url('PoppinsExtraBold.ttf') format('truetype');
+  }
+
+  body, .dataTables_wrapper, input, select, textarea {
+    font-family: 'Poppins';
+  }
+
+  .dataTables_wrapper {
+    font-family: 'PMedium' !important;
+  }
+
+  .btn-add {
+    background-color: #7ED957;  /* dark, contrasts yellow bg */
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  }
+
+  .btn-add:hover {
+    background-color: #6CC44B; /* darker on hover */
+    color: white !important;
+  }
+
+  .btn-update {
+    background-color: #5DA9E9;
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 8px 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  }
+
+  .btn-update:hover {
+    background-color: #4B93CF;
+    color: white !important;
+  }
+
+  .btn-delete {
+    background-color: #F46A6A;
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 8px 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  }
+
+  .btn-delete:hover {
+    background-color: #D85A5A;
+    color: white !important;
+  }
+
+  table.dataTable.stripe tbody tr.odd {
+    background-color: #FFFDE7;
+  }
+
+  .dataTables_filter label,
+  .dataTables_length label, .dataTables_wrapper .dataTables_info {
+    font-weight: normal;
+    color: #E58B2B !important;
+    font-family:'EpicPro';
+    letter-spacing: 1px;
+  }
+  
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+  color: white !important;            
+  border-radius: 6px !important;
+  padding: 4px 10px !important;
+  margin: 0 2px !important;
+  cursor: pointer;
+  font-family: 'EpicPro' !important;
+  transition: all 0.2s ease;
+  letter-spacing: 1px;
+  }
+  
+    .dataTables_wrapper .dataTables_paginate {
+  color: white !important;            /* text color */
+  font-family: 'EpicPro' !important;
+
+
+  }
+
+.dataTables_wrapper .dataTables_paginate .paginate_button,
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover,
+.dataTables_wrapper .dataTables_paginate .paginate_button:active,
+.dataTables_wrapper .dataTables_paginate .paginate_button:focus {
+  background: #FFc629 !important;
+  color: white !important;
+}
+
+/* Current page */
+.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+  background-color: #e58b2b !important;
+  color: white !important;
+  border-color: #e58b2b !important;
+}
+
+/* Disabled buttons */
+.dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
+  color: #999 !important;
+  cursor: not-allowed !important;
+  background-color: #f0f0f0 !important;
+}
+
+
+.dataTables_wrapper .dataTables_filter input, .dataTables_wrapper .dataTables_length select {
+    background-color: #fff;     
+    border: 2px solid #E58B2B !important;     
+    border-radius: 10px !important;
+    padding: 4px 8px;
+    font-family: 'PSemiBold';
+    font-size: 13px;
+}
+  .shiny-input-container label {
+    color: black;
+    font-family: 'PMedium';
+    font-weight: normal !important;
+  }
+
+  .btn {
+    font-family: 'PSemiBold';
+  }
+
+  .dataTables_wrapper {
+    font-family: 'Poppins';
+    font-size: 13px;
+  }
+  
+  table.dataTable tbody {
+  background-color: white;  /* or any color you want */
+}
+
+/* Optional: keep alternating row colors */
+table.dataTable.stripe tbody tr.odd {
+  background-color: #FFFFFF;  /* white */
+}
+table.dataTable.stripe tbody tr.even {
+  background-color: #FFFFE0;  /* light pastel yellow */
+}
+
+
+  .dataTables_wrapper .dataTable {
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  table.dataTable thead th {
+    background: linear-gradient(to bottom, #FFc629, #E58B2B, #E58B2B);
+    color: white;
+    font-family: 'EpicPro';
+    border-bottom: none;
+    text-transform: uppercase;
+    font-weight: normal !important;
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+
+  #app_title {
+    font-family: 'SuperAdorable', sans-serif;
+    font-size: 36px;
+    color: white;  /* change text color to stand out */
+    text-align: center;
+    width: 100%;
+    padding: 40px 0;
+    background-image: url('header.png');
+    background-size: cover;      /* make it cover the whole area */
+    background-position: center; /* center the image */
+    background-repeat: no-repeat;
+    box-shadow: 0px 2px 5px rgba(0,0,0,0.2);
+    margin-bottom: 20px;
+  }
+
+  .tab-content {
+  background-color:white;
+  border-radius: 0 16px 8px 8px;
+  padding: 20px;
+  border: 4px solid #E58B2B;
+  border-top: 8px solid #E58B2B;
+  }
+  
+  .nav-tabs > li {
+  margin-right: 6px;  /* adjust: 4px–10px works well */
+}
+
+  
+  .nav-tabs {
+  border-bottom: none; /* remove default gray bottom line */
+}
+  
+/* All tabs */
+ul.nav.nav-tabs > li > a {
+  border: 4px solid #E58B2B !important;
+  border-left: 8px solid #E58B2B !important;
+  border-bottom: 1px solid #E58B2B !important; /* show bottom border too */
+  border-radius: 12px 12px 0 0 !important;
+  background-color: white !important;  /* light pastel yellow */
+  color: #E58B2B !important;
+  font-family: 'EpicPro';
+  letter-spacing: 1px;
+  margin-right: 2px !important;
+  
+}
+
+/* Active tab */
+ul.nav.nav-tabs > li.active > a {
+  background-color: #E58B2B !important; /* gold for active */
+  color: white !important;
+  font-family: 'EpicPro';
+  border-radius: 12px 12px 0 0 !important;
+  border: 2px solid #E58B2B !important;
+  letter-spacing: 1px;
+
+}
+
+.sidebar-panel {
+  background: linear-gradient(
+    to bottom,
+    #ffc629,
+    #e58b2b
+  ) !important;
+  border: none;
+  border-radius: 20px 8px 8px 8px;
+
+}
+  /* === HIDE DEFAULT CHECKBOX === */
+  .sidebar-panel .checkbox input[type='checkbox'] {
+    display: none;  /* hide the actual checkbox */
+  }
+  
+  /* === CONTAINER: make choices wrap === */
+  .sidebar-panel .shiny-input-container {
+    display: flex;       /* horizontal layout */
+    flex-wrap: wrap;     /* wrap to next line if not enough space */
+    gap: 8px;            /* spacing between pills */
+  }
+  
+  /* === EACH CHECKBOX DIV INLINE === */
+  .sidebar-panel .shiny-input-container .checkbox {
+    display: inline-flex;   /* fit width to content */
+  }
+
+  /* === PILL BASE STYLE === */
+  .sidebar-panel .checkbox label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  
+    padding: 3px 14px;      /* adjusts to text */
+    border-radius: 999px;    /* pill shape */
+    background: transparent;
+    color: white !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    font-family: 'PSemiBold';
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    border: 2px solid white;
+    transition: all 0.2s ease;
+  }
+
+    /* === HOVER EFFECT === */
+    .sidebar-panel .checkbox label:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+    }
+    
+    /* === CHECKED STATE: FULL PILL COLOR === */
+    .sidebar-panel .checkbox label:has(input:checked) {
+      background: #FFD700;   /* yellow */
+      color: white;          /* text color */
+      border-color: #FFD700;
+    }
+
+    .sidebar-panel h4 {
+      font-size: 13px;
+      margin-bottom: 20px;
+      color: white;
+      font-family: 'FearRobot';
+      position: relative;
+    }
+
+    label,
+    .control-label,
+    .form-label {
+      color: inherit !important;
+      font-weight: inherit !important;
+    }
+
+    .shiny-input-container > div > p, #m_type-text > p, #m_gender-text > p {
+      font-family: 'Poppins' !important; 
+      margin-top: 3px !important;
+      font-size: 12px !important;
+    }
+
+  
+    #modal1 .modal-header, #modal2 .modal-header {
+      background: linear-gradient(to left, #fcd34d, #f97316);
+      padding: 15px 20px; 
+      border-top-left-radius: 12px;
+      border-top-right-radius: 12px;
+    }
+  
+    #modal1 .modal-header .modal-title, #modal2 .modal-header .modal-title {
+      font-size: 2.2rem;      /* adjust as needed */
+      font-family: 'EpicPro';
+      letter-spacing: 2px;
+      color: white;
+    }
+  
+    #modal1 .modal-dialog {
+    width: 650px;
+
+    }
+  
+    #modal1 .modal-content, #modal2 .modal-content {
+      border-radius: 12px;
+      }
+    
+    #modal2 .modal-dialog {
+      width: 650px;
+    }
+
+    #modal2 .modal-body {
+      padding: 0 !important;      
+    }
+
+    #modal1 .required-field label::after {
+      content: ' *';
+      color: red;
+    }
+
+  #modal1 input:focus,
+  #modal1 textarea:focus,
+  #modal1 .shiny-file-input:focus {
+    outline: 2px solid #f97316 ;  /* orange focus ring */
+    border:none !important;
+    box-shadow: none !important;
+  }
+  
+  #modal1 .selectize-input.focus {
+  outline: 2px solid #f97316 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.notif-icon {
+  width: auto;
+  height: 35px;
+}
+
+    .shiny-notification {
+      font-family: PMedium;
+      border-radius: 10px;
+      padding: 10px 10px;
+      font-size: 14px;
+      position: fixed !important;
+      width: 20% !important; 
+      border: 2px solid white;
+      top: 5px !important;
+      left: auto !important;
+      right: 5px !important;
+      bottom: auto !important;
+      animation: slideInLeft 0.3s ease-out;
+    }
+    
+    @keyframes slideInLeft {
+      from {
+        transform: translateX(40px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    
+    .shiny-notification-message {
+      background: linear-gradient(135deg, #34d399, #10b981);
+      color: white;
+      opacity: 1;
+    }
+    
+    .shiny-notification-close {
+      display: none !important;
+    }
+  
+"))
+    
+  ),
+  
+  # JS to handle Cropper
+  tags$script(HTML("
+Shiny.addCustomMessageHandler('showImage', function(message) {
+  var image = document.getElementById('cropper_preview');
+  image.src = message.src;
+  image.style.display = 'block';
+
+  // Wait for modal to finish opening
+  $('#modal2').on('shown.bs.modal', function () {
+
+    if (window.cropper) {
+      window.cropper.destroy();
+    }
+
+    window.cropper = new Cropper(image, {
+      aspectRatio: 1,
+      viewMode: 1,
+      autoCropArea: 1,
+      responsive: true,
+      movable: true,
+      zoomable: true,
+      cropBoxResizable: true
+    });
+
+    // Force recalculation after animation
+    setTimeout(() => {
+      window.cropper.reset();
+      window.cropper.resize();
+    }, 50);
+  });
+});
+
+$(document).on('click', '#confirm_crop', function(){
+  if(window.cropper){
+    var canvas = window.cropper.getCroppedCanvas({ width: 200, height: 200 });
+    canvas.toBlob(function(blob){
+      var reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = function() {
+        Shiny.setInputValue('cropped_image', reader.result, {priority: 'event'});
+        // ✅ do NOT hide modal manually
+      };
+    });
+  } else {
+    Shiny.setInputValue('cropped_image', null, {priority: 'event'});
+  }
+});
+
+// Ensure body padding is cleared if modal is removed
+$(document).on('hidden.bs.modal', '.modal', function () {
+  $('body').removeClass('modal-open');
+  $('body').css('padding-right','');
+  $('.modal-backdrop').remove();
+});
+")),
+  
+  tags$h1("Pet Shop Management System", id = "app_title"),
+  
+  tabsetPanel( id = "tabs",
+               tabPanel(
+                 title = tagList(
+                   icon("tachometer-alt"),  # dashboard icon
+                   span("DASHBOARD")
+                 ),
+      fluidRow(
+        column(4, uiOutput("total_pets")),
+        column(4, uiOutput("available_pets")),
+        column(4, uiOutput("purchased_pets"))
+      )
+    ),
+    
+    tabPanel(
+      title = tagList(
+        icon("paw"),  # pet icon
+        span("PETS")
+      ),
+      fluidRow(
+        style = "margin-top: 5px;",
+        # --- Left Sidebar ---
+        column(
+          width = 3,  # 3/12 of row width
+          wellPanel(
+            class = "sidebar-panel",
+            div(
+              style = "display:flex; align-items:center; gap:10px;",
+              
+              # Add Pet button
+              actionButton(
+                "open_add",
+                "Add Pet",
+                icon = icon("plus"),
+                class = "btn-add"
+              ),
+              
+              # Reset Filter button (middle)
+              actionButton(
+                "reset_filter",
+                label = NULL,
+                icon = tags$img(
+                  src = "icons/resetfilter.svg",
+                  width = "25px",
+                  height = "25px"
+                ),
+                style = "
+      border-radius:10px;
+      background: linear-gradient(to right, #FFC629, #FFD700);
+      border:2px solid white;
+      cursor:pointer;
+      padding: 3px 5px;
+    "
+              ),
+              
+              # Notification wrapper
+              div(
+                style = "position:relative;",
+                
+                actionButton(
+                  "notif_icon",
+                  label = NULL,
+                  icon = tags$img(
+                    src = "icons/lowstock.svg",
+                    width = "45px",
+                    height = "45px"
+                  ),
+                  style = "
+        border-radius:50%;
+        background:transparent;
+        border:none;
+        margin-left: 30px;
+      "
+                ),
+                
+                # Badge (overlapping the icon)
+                tags$span(
+                  id = "notif_count",
+                  textOutput("notif_count_text"),
+                  class = "badge bg-danger",
+                  style = "
+        position:absolute;
+        top:5px;
+        right:2px;
+        background-color:red;
+        font-size:11px;
+        padding:3px 6px;
+        border-radius:50%;
+      "
+                )
+              )
+            ),
+            uiOutput("notif_dropdown"),
+            hr(),
+            h4(
+              tagList(
+                icon("filter"),
+                span("FILTER BY TYPE")
+              )
+            ),
+            checkboxGroupInput("filter_type", NULL,
+                               choices = c("Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster"),
+                               selected = c("Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster")),
+            h4(
+              tagList(
+                icon("filter"),
+                span("FILTER BY GENDER")
+              )
+            ),
+            checkboxGroupInput("filter_gender", NULL,
+                               choices = c("Male", "Female"),
+                               selected = c("Male", "Female")),
+            h4(
+              tagList(
+                icon("filter"),
+                span("FILTER BY STATUS")
+              )
+            ),
+            checkboxGroupInput("filter_status", NULL,
+                               choices = c("Available", "Purchased"),
+                               selected = c("Available", "Purchased"))
+          )
+        ),
+        
+        # --- Table on Right ---
+        column(
+          width = 9,
+          DTOutput("pet_table")
+        )
+      )
+    )
+    
+  )
+)
+
+# ================= SERVER =================
+server <- function(input, output, session) {
+  
+  pets_data <- reactiveVal()
+  pet_additional_infos_data <- reactiveVal()
+  
+  loadPets <- function() {
+    data <- dbGetQuery(db, "SELECT * FROM pets")
+    pets_data(data)  # update reactive
+    return(data)     # return for assignments if needed
+  }
+  loadPets()
+  
+  loadPetAdditionalInfos <- function() {
+    data <- dbGetQuery(db, "SELECT * FROM pet_additional_infos")
+    pet_additional_infos_data(data)
+    return(data)
+  }
+  loadPetAdditionalInfos()
+  petIconPath <- function(type) {
+    type <- tolower(type)
+    
+    if (type == "dog") {
+      "icons/dog.svg"
+    } else if (type == "cat") {
+      "icons/cat.svg"
+    } else if (type == "bird") {
+      "icons/bird.svg"
+    } else if (type == "fish") {
+      "icons/fish.svg"
+    } else if (type == "rabbit") {
+      "icons/rabbit.svg"
+    } else {
+      "icons/hamster.svg"
+    }
+  }
+  
+  
+  # ---------- DASHBOARD ----------
+  output$total_pets <- renderUI({
+    div(class = "stat-box",
+        div(nrow(pets_data()), class = "stat-number"),
+        div("TOTAL PETS", class = "stat-label"))
+  })
+  
+  output$available_pets <- renderUI({
+    div(class = "stat-box",
+        div(sum(pets_data()$status == "Available"), class = "stat-number"),
+        div("AVAILABLE", class = "stat-label"))
+  })
+  
+  output$purchased_pets <- renderUI({
+    div(class = "stat-box",
+        div(sum(pets_data()$status == "Purchased"), class = "stat-number"),
+        div("PURCHASED", class = "stat-label"))
+  })
+  
+
+  output$notif_count_text <- renderText({
+    nrow(notif_data())
+  })
+  
+  output$notif_dropdown <- renderUI({
+    if (!notif_visible()) return(NULL)
+    
+    notifs <- notif_data()
+    if (nrow(notifs) == 0) return(NULL)
+    
+    tags$div(
+      style = "
+      position:absolute;
+      left:280px;
+      top:65px;
+      width:260px;
+      max-height:400px;
+      overflow-y:auto;
+      background:white;
+      border:2px solid #f51a01;
+      border-radius:8px;
+      box-shadow:0 2px 5px rgba(0,0,0,0.2);
+      z-index:999;
+    ",
+      
+      lapply(seq_len(nrow(notifs)), function(i) {
+        tags$div(
+          style = "
+          padding:10px;
+          display:flex;
+          background-color: white;
+          align-items:center;
+          gap:10px;
+        ",
+          
+          # ---- ICON ----
+          tags$img(
+            src   = petIconPath(notifs$type[i]),
+            class = paste(
+              "notif-icon",
+              paste0("icon-", tolower(notifs$type[i]))
+            )
+          ),
+          
+          # ---- TEXT ----
+          tags$div(
+            style = "
+            font-family:Poppins;
+            font-size:14px;
+            color:#f51a01;
+            line-height:1.3;
+          ",
+            tags$strong(notifs$type[i]),
+            tags$span(
+              style = "color:#f51a01;",
+              paste0(" stock low: ", notifs$available[i], " left")
+            )
+          )
+        )
+      })
+    )
+  })
+  
+  
+  
+  # ---------- PET TABLE ----------
+  output$pet_table <- renderDT({
+    input$reload_pets
+    
+    filtered_data <- pets_data() %>%
+      filter(
+        type %in% input$filter_type,
+        gender %in% input$filter_gender,
+        status %in% input$filter_status
+      ) %>%
+      left_join(pet_additional_infos_data(), by = c("id" = "pet_id")) %>%
+      mutate(
+        # ---- PET ID ----
+        PetID = paste0(
+          '<span style="letter-spacing:1px; font-family:PSemiBold; color:#555;">',
+          "PET-",
+          sprintf("%03d", id),  # zero-padded ID
+          "-",
+          case_when(
+            type == "Dog"     ~ "DOG",
+            type == "Cat"     ~ "CAT",
+            type == "Bird"    ~ "BRD",
+            type == "Fish"    ~ "FSH",
+            type == "Rabbit"  ~ "RBT",
+            type == "Hamster" ~ "HTR",
+            TRUE              ~ "UNK"
+          ),
+          '</span>'
+        ),
+        
+        # ---- PROFILE COLUMN ----
+        PetProfile = paste0(
+          '<div style="display:flex; align-items:center; gap:10px;">',
+          '<img src="pet_images/', image, '" style="width:45px;height:45px;object-fit:cover;border-radius:50%;">',
+          '<div style="line-height:1.2;">',
+          '<div style="font-family:PSemiBold;">', name, '</div>',
+          '<div style="font-size:12px;color:#555;">',
+          type, ", ",
+          ifelse(
+            age >= 12,
+            paste0(floor(age / 12), " yr",
+                   ifelse(age %% 12 > 0, paste0(" ", age %% 12, " mo"), "")
+            ),
+            paste0(age, " mo")
+          ),
+          '</div></div></div>'
+        ),
+        
+        # ---- SORT HELPERS ----
+        PetName = name,
+        
+        # ---- FIX TIMEZONE (UTC → PH) ----
+        AddedOn_raw = as.POSIXct(created_at, tz = "UTC") %>%
+          as.POSIXct(tz = "Asia/Manila"),
+        
+        AddedOn = paste0(
+          format(as.POSIXct(created_at, tz = "UTC") %>% as.POSIXct(tz = "Asia/Manila"), "%b %d, %Y"),
+          "<br>",
+          format(as.POSIXct(created_at, tz = "UTC") %>% as.POSIXct(tz = "Asia/Manila"), "%I:%M %p")
+        ),
+        
+        Breed = ifelse(is.na(breed), "N/A", breed),
+        
+        Status = ifelse(
+          status == "Available",
+          '<span style="display:inline-block;padding:5px 12px;border-radius:15px;background:#28a745;color:white;font-size:12px;">Available</span>',
+          '<span style="display:inline-block;padding:5px 12px;border-radius:15px;background:#ffc107;color:white;font-size:12px;">Purchased</span>'
+        ),
+        
+        Actions = paste0(
+          '<div style="display:flex; gap:8px; justify-content:center;">',
+          
+          '<button class="btn-icon btn-update" ',
+          'title="Edit" ',
+          'onclick="Shiny.setInputValue(\'edit_id\', ', id, ', {priority:\'event\'})">',
+          '<img src="icons/edit2.svg" width="16" height="16">',
+          '</button>',
+          
+          '<button class="btn-icon btn-delete" ',
+          'title="Delete" ',
+          'onclick="Shiny.setInputValue(\'delete_id\', ', id, ', {priority:\'event\'})">',
+          '<img src="icons/delete.svg" width="18" height="18">',
+          '</button>',
+          
+          '</div>'
+        )
+      ) %>%
+      select(
+        PetID,       # <-- added Pet ID column
+        PetProfile,
+        PetName,
+        Breed,
+        gender,
+        price,
+        Status,
+        AddedOn,
+        AddedOn_raw,
+        Actions
+      )
+    
+    datatable(
+      filtered_data,
+      escape = FALSE,
+      rownames = FALSE,
+      selection = "none",
+      colnames = c(
+        "Pet ID",    # <-- display Pet ID
+        "Profile",
+        "PetName",
+        "Breed",
+        "Gender",
+        "Price ($)",
+        "Status",
+        "Added On",
+        "AddedOn_raw",
+        "Actions"
+      ),
+      options = list(
+        columnDefs = list(
+          list(visible = FALSE, targets = c(2, 8)),          # hide AddedOn_raw only
+          list(orderable = TRUE, targets = 1, orderData = 2), # Profile → PetName
+          list(orderable = TRUE, targets = 7, orderData = 8), # Added On → raw datetime
+          list(orderable = FALSE, targets = 9),
+          list(className = "dt-center", targets = 9)
+        ),
+        order = list(list(8, "desc")),  # newest first
+        language = list(
+          zeroRecords = HTML(
+            " <div style='width:100vw; margin-left:calc(-50vw + 50%); padding:20px; text-align:center; background-color:white;'> 
+        <img src='corgisleeping.gif' style='margin-bottom:0rem; width:auto; height:16rem;'> 
+        <p style='font-size:2.5rem; font-family:PExBold; color:#374151; margin-bottom:0.2rem; text-align:center;'>No pets match your search</p> 
+        <p style='font-size:1.3rem; font-family:PMedium; color:#6b7280; margin-bottom:1rem; text-align:center;'>It looks like your search or filter didn’t match any existing pets</p> 
+        <button onclick='Shiny.setInputValue(\"reload_pets\", Math.random(), {priority:\"event\"})' style='font-family:PSemiBold; display:inline-flex; align-items:center; background: linear-gradient(to right, #fcd34d, #f97316); color:white; padding:0.5rem 1.5rem; border-radius:9999px; box-shadow:0 2px 4px rgba(0,0,0,0.15); transition:all 0.3s ease; gap:0.5rem; border:none; cursor:pointer; font-size:1.5rem;'> 
+          <img src='icons/reload2.svg' width='16' height='16'> Reload 
+      </div> "
+          )
+        )
+      )
+    )
+  })
+  
+  notif_data <- reactiveVal(
+    tibble(
+      type = character(),
+      available = numeric()
+    )
+  )
+  is_editing <- reactiveVal(FALSE)
+  notif_visible <- reactiveVal(FALSE)
+  original_image <- reactiveVal(NULL)
+  current_edit_id <- reactiveVal(NULL)
+  # Temporary storage
+  temp_image <- reactiveVal(NULL)
+  cropped_image <- reactiveVal(NULL)
+  
+  # Reactive values to store form inputs temporarily
+  pet_form <- reactiveValues(
+    name = NULL,
+    type = NULL,
+    age = NULL,
+    gender = NULL,
+    price = NULL,
+    status = NULL,
+    breed = NULL
+  )
+  
+  # ---------- ADD PET MODAL ----------
+  showAddPetModal <- function(cropped = NULL) {
+    
+    required_class <- if (is_editing()) NULL else "required-field"
+    
+    showModal(
+      tags$div(
+        id = "modal1",
+        modalDialog(
+          title = tags$div(
+            style = "display:flex; align-items:center; gap:8px;",
+            
+            tags$img(
+              src = if (is_editing())
+                "icons/edit.svg"
+              else
+                "icons/add.svg",
+              height = "30px",
+              width = "30px",
+              style = "vertical-align:middle;"
+            ),
+            
+            span(
+              if (is_editing()) "Update Pet" else "Add Pet"
+            )
+          ),
+          
+          # ---- Modal body ----
+          div(
+            class = "modal-body-content",
+            style = "display: flex; flex-wrap: wrap; column-gap: 70px; justify-content: center; padding: 10px 0;",
+            
+            # Pet Name
+            div(
+              class = required_class,
+              style = "flex: 1 1 48%; max-width: 250px;",
+              textInput(
+                "m_name",
+                "Pet Name",
+                value = pet_form$name,
+                placeholder = "Enter pet name"
+              )
+            ),
+            
+            # Pet Type
+            div(
+              class = required_class,
+              style = "flex: 1 1 48%; max-width: 250px;",
+              selectInput(
+                "m_type",
+                "Pet Type",
+                choices = list(
+                  "Select pet type" = "",
+                  "Dog" = "Dog",
+                  "Cat" = "Cat",
+                  "Bird" = "Bird",
+                  "Fish" = "Fish",
+                  "Rabbit" = "Rabbit",
+                  "Hamster" = "Hamster"
+                ),
+                selected = if (is.null(pet_form$type)) "" else pet_form$type
+              )
+            ),
+            
+            # Age
+            div(
+              class = required_class,
+              style = "flex: 1 1 48%; max-width: 250px;",
+              numericInput(
+                "m_age",
+                "Age (months)",
+                value = pet_form$age,
+                min = 0
+              )
+            ),
+            
+            # Gender
+            div(
+              class = required_class,
+              style = "flex: 1 1 48%; max-width: 250px;",
+              selectInput(
+                "m_gender",
+                "Gender",
+                choices = list(
+                  "Select gender" = "",
+                  "Male" = "Male",
+                  "Female" = "Female"
+                ),
+                selected = if (is.null(pet_form$gender)) "" else pet_form$gender
+              )
+            ),
+            
+            # Price
+            div(
+              class = required_class,
+              style = "flex: 1 1 48%; max-width: 250px;",
+              numericInput(
+                "m_price",
+                "Price",
+                value = pet_form$price,
+                min = 0
+              )
+            ),
+            
+            # Status
+            div(
+              class = required_class,
+              style = "flex: 1 1 48%; max-width: 250px;",
+              selectInput(
+                "m_status",
+                "Status",
+                choices = c("Available", "Purchased"),
+                selected = if (is.null(pet_form$status)) "Available" else pet_form$status
+              )
+            ),
+            
+            # Breed
+            div(
+              style = "flex: 1 1 48%; max-width: 250px;",
+              textInput(
+                "m_breed",
+                "Breed (optional)",
+                value = pet_form$breed,
+                placeholder = "Enter breed (optional)"
+              )
+            ),
+            
+            # Image Upload
+            div(
+              class = required_class,
+              style = "flex: 1 1 48%; max-width: 250px; display:flex; flex-direction:column; gap:2px;",
+              
+              tags$style(HTML("
+              #m_image + .shiny-input-container {
+                margin-top: 0px !important;
+                margin-bottom: 0px !important;
+              }
+            ")),
+              
+              fileInput(
+                "m_image",
+                label = if (
+                  is.null(cropped_image()) && is.null(temp_image())
+                ) "Upload Pet Image" else "Upload New Pet Image",
+                accept = c(".png", ".jpg", ".jpeg")
+              ),
+              
+              if (!is.null(cropped_image()) || !is.null(temp_image())) {
+                tags$img(
+                  src = if (!is.null(cropped_image()))
+                    cropped_image()
+                  else
+                    temp_image(),
+                  style = "max-width:100px; border-radius:10px; margin-top:-40px;"
+                )
+              }
+            )
+          ),
+          
+          # ---- Modal footer ----
+          footer = tagList(
+            modalButton("Cancel"),
+            actionButton(
+              "save_pet",
+              label = tagList(
+                tags$img(src = "icons/save.svg", width = "16px", height = "16px", style = "vertical-align:middle; margin-right:3px; margin-bottom: 2px;"),
+                if (is_editing()) "Update" else "Save"
+              ),
+              class = "btn-add",
+              style = "background: linear-gradient(to right, #fcd34d, #f97316);color:white;border:none;padding:6px 12px;display:inline-flex;align-items:center;gap:3px;"
+            )
+          ),
+          
+          size = "l",
+          class = "custom-add-pet-modal"
+        )
+      )
+    )
+  }
+
+observeEvent(input$notif_icon, { notif_visible(!notif_visible()) })
+  
+observeEvent(input$reset_filter, {
+  updateCheckboxGroupInput(session, "filter_type",
+                           selected = c("Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster"))
+  updateCheckboxGroupInput(session, "filter_gender",
+                           selected = c("Male", "Female"))
+  updateCheckboxGroupInput(session, "filter_status",
+                           selected = c("Available", "Purchased"))
+})
+
+  
+observe({
+  req(pets_data())
+  
+  all_types <- tibble(type = c("Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster"))
+  
+  stock_count <- pets_data() %>%
+    filter(status == "Available") %>%
+    count(type) %>%
+    right_join(all_types, by = "type") %>%
+    mutate(n = ifelse(is.na(n), 0, n))
+  
+  # Only keep types with 5 or fewer pets
+  low_stock <- stock_count %>% filter(n <= 5)
+  
+  # Update notif_data reactiveVal
+  notif_data(low_stock %>% select(type, available = n))
+})
+
+  
+  
+  # ---------- OPEN ADD PET ----------
+  observeEvent(input$open_add, {
+    
+    is_editing(FALSE)
+    current_edit_id(NULL)
+    
+    pet_form <<- reactiveValues()
+    temp_image(NULL)
+    cropped_image(NULL)
+    
+    showAddPetModal()
+  })
+  
+  
+  # ---------- PREVIEW / CROP MODAL ----------
+  observeEvent(input$m_image, {
+    req(input$m_image)
+    
+    # Save uploaded image as base64
+    img_file <- input$m_image$datapath
+    img_type <- tools::file_ext(input$m_image$name)
+    img_base64 <- base64enc::dataURI(file = img_file, mime = paste0("image/", img_type))
+    
+    temp_image(img_base64)
+    
+    showModal(
+      tags$div(
+        id = "modal2",
+        modalDialog(
+          title = "Preview & Crop Image",
+          div(
+            id = "cropper_container",
+            style = "width:100% !important; height: 100% !important; display:block; padding:0; margin:0;",
+            tags$img(
+              id = "cropper_preview",
+              src = img_base64,
+              style = "width:100% !important; height: 100% !important; display:block; object-fit:contain;"
+            )
+          ),
+          footer = tagList(
+            actionButton("discard_crop", "Discard", class = "btn btn-secondary"),
+            actionButton("confirm_crop", "Save", class = "btn-add")
+          ),
+          size = "l",      # large modal for more width
+          easyClose = FALSE
+        )
+      )
+    )
+    
+    # Send to Cropper.js
+    session$sendCustomMessage("showImage", list(src = img_base64))
+  })
+  
+  # ---------- CONFIRM CROPPING ----------
+  observeEvent(input$cropped_image, {
+    req(input$cropped_image)
+    cropped_image(input$cropped_image)
+    
+    removeModal() 
+    
+    # Keep previous inputs
+    pet_form$name <- input$m_name
+    pet_form$type <- input$m_type
+    pet_form$age <- input$m_age
+    pet_form$gender <- input$m_gender
+    pet_form$price <- input$m_price
+    pet_form$status <- input$m_status
+    pet_form$breed <- input$m_breed
+    
+    showAddPetModal(cropped = cropped_image())
+  })
+  
+  observeEvent(input$discard_crop, {
+    # Save current inputs before closing crop modal
+    isolate({
+      pet_form$name   <- input$m_name
+      pet_form$type   <- input$m_type
+      pet_form$age    <- input$m_age
+      pet_form$gender <- input$m_gender
+      pet_form$price  <- input$m_price
+      pet_form$status <- input$m_status
+      pet_form$breed  <- input$m_breed
+    })
+    
+    removeModal()  # Close the crop modal
+    
+    if (!is_editing()) {
+      # Adding new pet → discard everything
+      temp_image(NULL)
+      cropped_image(NULL)
+      reset("m_image")
+    } else {
+      # Editing → restore the original image before browsing
+      temp_image(original_image())
+      cropped_image(NULL)
+    }
+    
+    # Reopen Add Pet modal
+    showAddPetModal(cropped = NULL)
+  })
+  
+  observeEvent(input$reload_pets, {
+    loadPets()
+    loadPetAdditionalInfos()
+  })
+  
+  # ---------- EDIT PET ----------
+  observeEvent(input$edit_id, {
+    req(input$edit_id)
+    
+    pet <- pets_data() %>% filter(id == input$edit_id)
+    pet_info <- pet_additional_infos_data() %>% filter(pet_id == input$edit_id)
+    
+    pet_form$name   <- pet$name
+    pet_form$type   <- pet$type
+    pet_form$age    <- pet$age
+    pet_form$gender <- pet$gender
+    pet_form$price  <- pet$price
+    pet_form$status <- pet$status
+    pet_form$breed  <- pet_info$breed
+    
+    temp_image(paste0("pet_images/", pet_info$image))
+    original_image(paste0("pet_images/", pet_info$image))
+    cropped_image(NULL)
+    
+    is_editing(TRUE)
+    current_edit_id(input$edit_id)
+    
+    showAddPetModal()
+  })
+  
+  # ---------- SAVE PET ----------
+  observeEvent(input$save_pet, {
+    
+    # Initialize validity flag
+    valid <- TRUE
+    
+    # ---------- VALIDATION ----------
+    if (is.null(input$m_name) || input$m_name == "") {
+      feedbackWarning("m_name", text = "This field is required", color = "red", show = TRUE)
+      valid <- FALSE
+    } else hideFeedback("m_name")
+    
+    if (is.null(input$m_type) || input$m_type == "") {
+      feedbackWarning("m_type", text = "This field is required", color = "red", show = TRUE)
+      valid <- FALSE
+    } else hideFeedback("m_type")
+    
+    if (is.null(input$m_age) || is.na(input$m_age) || input$m_age <= 0) {
+      feedbackWarning("m_age", text = "This field is required", color = "red", show = TRUE)
+      valid <- FALSE
+    } else hideFeedback("m_age")
+    
+    if (is.null(input$m_gender) || input$m_gender == "") {
+      feedbackWarning("m_gender", text = "This field is required", color = "red", show = TRUE)
+      valid <- FALSE
+    } else hideFeedback("m_gender")
+    
+    if (is.null(input$m_price) || is.na(input$m_price) || input$m_price < 0) {
+      feedbackWarning("m_price", text = "This field is required", color = "red", show = TRUE)
+      valid <- FALSE
+    } else hideFeedback("m_price")
+    
+    if (is.null(input$m_status) || input$m_status == "") {
+      feedbackWarning("m_status", text = "This field is required", color = "red", show = TRUE)
+      valid <- FALSE
+    } else hideFeedback("m_status")
+    
+    if (!is_editing() && !isTruthy(cropped_image()) && !isTruthy(temp_image())) {
+      feedbackWarning("m_image", text = "Pet image is required", color = "red", show = TRUE)
+      valid <- FALSE
+    } else hideFeedback("m_image")
+    
+    if (!valid) return()
+    
+    # ---------- HANDLE IMAGE ----------
+    img_filename <- NULL
+    image_changed <- FALSE
+    
+    if (!is.null(cropped_image()) && grepl("^data:image", cropped_image())) {
+      # New cropped image uploaded
+      base64data <- gsub("^data:image/[^;]+;base64,", "", cropped_image())
+      img_bin <- base64enc::base64decode(base64data)
+      
+      dir.create("www/pet_images", showWarnings = FALSE, recursive = TRUE)
+      
+      img_filename <- paste0(gsub("[- :]", "", Sys.time()), "_", input$m_name, ".png")
+      writeBin(img_bin, file.path("www/pet_images", img_filename))
+      
+      image_changed <- TRUE
+    } else if (is_editing()) {
+      # Keep existing filename from DB
+      pet_info <- pet_additional_infos_data() %>% filter(pet_id == current_edit_id())
+      if (nrow(pet_info) > 0) {
+        img_filename <- pet_info$image
+      }
+    }
+    
+    # ---------- HANDLE BREED ----------
+    breed_value <- if (!is.null(input$m_breed) && nzchar(trimws(input$m_breed))) {
+      input$m_breed
+    } else {
+      "N/A"
+    }
+    
+    # ---------- SAVE TO DATABASE ----------
+    if (is_editing()) {
+      
+      dbBegin(db)
+      tryCatch({
+        
+        # Update pets table
+        dbExecute(db,
+                  "UPDATE pets 
+               SET name=?, type=?, age=?, gender=?, price=?, status=? 
+               WHERE id=?",
+                  params = list(
+                    input$m_name, input$m_type, input$m_age,
+                    input$m_gender, input$m_price, input$m_status,
+                    current_edit_id()
+                  )
+        )
+        
+        # Update pet_additional_infos table
+        if (image_changed) {
+          # Update breed and image
+          dbExecute(db,
+                    "UPDATE pet_additional_infos
+             SET breed=?, image=?
+             WHERE pet_id=?",
+                    params = list(breed_value, img_filename, current_edit_id())
+          )
+        } else {
+          # Update only breed
+          dbExecute(db,
+                    "UPDATE pet_additional_infos
+             SET breed=?
+             WHERE pet_id=?",
+                    params = list(breed_value, current_edit_id())
+          )
+        }
+        
+        dbCommit(db)
+        showNotification(
+          HTML(
+            paste0(
+              '<div style="display:flex; align-items:center; gap:7px;">',
+              '<img src="icons/check.svg" style="width:17px;height:17px;">',
+              '<span style="flex:1; font-family:PSemiBold;">Pet updated successfully!</span>',
+              '<button onclick="$(this).closest(\'.shiny-notification\').remove()" ',
+              'style="background:none;border:none;cursor:pointer;margin-bottom:2px;">',
+              '<img src="icons/close.svg" style="width:12px;height:12px;">',
+              '</button>',
+              '</div>'
+            )
+          ),
+          type = "message"
+        )
+        
+      }, error = function(e){
+        dbRollback(db)
+        showNotification(paste("Error updating pet:", e$message), type = "error")
+        return()
+      })
+      
+    } else {
+      
+      dbBegin(db)
+      tryCatch({
+        
+        # Insert into pets table
+        dbExecute(db,
+                  "INSERT INTO pets (name, type, age, gender, price, status)
+                 VALUES (?, ?, ?, ?, ?, ?)",
+                  params = list(
+                    input$m_name, input$m_type, input$m_age,
+                    input$m_gender, input$m_price, input$m_status
+                  )
+        )
+        
+        pet_id <- dbGetQuery(db, "SELECT last_insert_rowid() AS id")$id[1]
+        
+        # Insert into additional infos table
+        dbExecute(db,
+                  "INSERT INTO pet_additional_infos (pet_id, breed, image, created_at)
+                  VALUES (?, ?, ?, datetime('now'))",
+                  params = list(pet_id, breed_value, img_filename)
+        )
+        
+        dbCommit(db)
+        showNotification(
+          HTML(
+            paste0(
+              '<div style="display:flex; align-items:center; gap:7px;">',
+              '<img src="icons/check.svg" style="width:17px;height:17px;">',
+              '<span style="flex:1; font-family:PSemiBold;">Pet added successfully!</span>',
+              '<button onclick="$(this).closest(\'.shiny-notification\').remove()" ',
+              'style="background:none;border:none;cursor:pointer;margin-bottom:2px;">',
+              '<img src="icons/close.svg" style="width:12px;height:12px;">',
+              '</button>',
+              '</div>'
+            )
+          ),
+          type = "message"
+        )
+        
+      }, error = function(e){
+        dbRollback(db)
+        showNotification(paste("Error adding pet:", e$message), type = "error")
+        return()
+      })
+      
+    }
+    
+    # ---------- REFRESH DATA ----------
+    loadPets()
+    loadPetAdditionalInfos()
+    
+    # ---------- RESET STATE ----------
+    is_editing(FALSE)
+    current_edit_id(NULL)
+    temp_image(NULL)
+    cropped_image(NULL)
+    
+    pet_form$name   <- NULL
+    pet_form$type   <- NULL
+    pet_form$age    <- NULL
+    pet_form$gender <- NULL
+    pet_form$price  <- NULL
+    pet_form$status <- NULL
+    pet_form$breed  <- NULL
+    
+    removeModal()
+    
+  })
+  
+  
+  
+  
+  # ---------- DELETE PET ----------
+  observeEvent(input$delete_id, {
+    req(input$delete_id)
+    showModal(modalDialog(
+      title = "Confirm Delete",
+      "Are you sure you want to delete this pet?",
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("confirm_delete", "Delete", class = "btn-delete")
+      )
+    ))
+  })
+  
+  observeEvent(input$confirm_delete, {
+    req(input$delete_id)
+    
+    tryCatch({
+      # Delete the additional info row first
+      dbExecute(db, "DELETE FROM pet_additional_infos WHERE pet_id = ?", params = list(input$delete_id))
+      
+      # Delete the pet
+      dbExecute(db, "DELETE FROM pets WHERE id = ?", params = list(input$delete_id))
+      
+      removeModal()
+      
+      # Refresh data
+      loadPets()
+      loadPetAdditionalInfos()
+      
+      showNotification("Pet deleted successfully!", type = "message")
+      
+    }, error = function(e) {
+      showNotification(paste("Error deleting pet:", e$message), type = "error")
+    })
+  })
+  
+  
+}
+
+shinyApp(ui, server)
