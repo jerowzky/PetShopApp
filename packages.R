@@ -5,7 +5,7 @@
 # Load all required packages
 library(shiny)
 library(DBI)
-library(RMariaDB)
+library(RSQLite)
 library(DT)
 library(dplyr)
 library(base64enc)
