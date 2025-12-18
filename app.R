@@ -677,6 +677,22 @@ function loopAnimation() {
 
 // Start animation
 setTimeout(loopAnimation, 2000);
+
+document.addEventListener('click', function (e) {
+  if (e.target && e.target.id === 'toggle_pass') {
+    const passInput = document.getElementById('login_pass');
+    if (!passInput) return;
+
+    if (passInput.type === 'password') {
+      passInput.type = 'text';
+      e.target.src = 'icons/eye.svg';
+    } else {
+      passInput.type = 'password';
+      e.target.src = 'icons/eye-slash.svg';
+    }
+  }
+});
+
 ")),
   uiOutput("page")
   )
@@ -1123,22 +1139,7 @@ server <- function(input, output, session) {
         actionButton("login_btn", "Login", class = "btn btn-warning")
       )
     ),
-    tags$script(HTML("
-    const passInput = document.getElementById('login_pass');
-    const toggle = document.getElementById('toggle_pass');
 
-    if (passInput && toggle) {
-      toggle.addEventListener('click', function () {
-        if (passInput.type === 'password') {
-          passInput.type = 'text';
-          toggle.src = 'icons/eye.svg';
-        } else {
-          passInput.type = 'password';
-          toggle.src = 'icons/eye-slash.svg';
-        }
-      });
-    }
-  "))
   )
   
 
