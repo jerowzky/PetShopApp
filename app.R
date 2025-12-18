@@ -1,7 +1,6 @@
 source("packages.R")
 
-
-# --- MySQL connection ---
+# --- SQLite connection ---
 db <- dbConnect(RSQLite::SQLite(), "mypetshop.sqlite")
 
 dbExecute(db, "
@@ -30,6 +29,7 @@ CREATE TABLE IF NOT EXISTS pet_additional_infos (
 
 # ================= UI =================
 ui <- fluidPage(
+  style = "padding-left:0; padding-right:0;",
   useShinyFeedback(),
   useShinyjs(),
   tags$head(
@@ -37,6 +37,13 @@ ui <- fluidPage(
     tags$script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"),
     
     tags$style(HTML("
+    
+        html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      height: 100%;
+      width: 100%;
+    }
   .stat-box {
     background: #ffc629;
     padding: 25px;
@@ -99,6 +106,7 @@ ui <- fluidPage(
 
   body, .dataTables_wrapper, input, select, textarea {
     font-family: 'Poppins';
+
   }
 
   .dataTables_wrapper {
@@ -258,11 +266,13 @@ table.dataTable.stripe tbody tr.even {
     color: white;  /* change text color to stand out */
     text-align: center;
     width: 100%;
+    height: 115px;
     padding: 40px 0;
-    background-image: url('header.png');
-    background-size: cover;      /* make it cover the whole area */
-    background-position: center; /* center the image */
-    background-repeat: no-repeat;
+    background-color: #ffd134;
+    background-image: url('header3.png');
+    background-size: auto 100%;       /* height fits container, width adjusts automatically */
+    background-position: center;      /* center the image */
+    background-repeat: no-repeat;     /* no repeating */
     box-shadow: 0px 2px 5px rgba(0,0,0,0.2);
     margin-bottom: 20px;
   }
@@ -452,7 +462,6 @@ ul.nav.nav-tabs > li.active > a {
       padding: 10px 10px;
       font-size: 14px;
       position: fixed !important;
-      width: 20% !important; 
       border: 2px solid white;
       top: 5px !important;
       left: auto !important;
@@ -476,12 +485,108 @@ ul.nav.nav-tabs > li.active > a {
     .shiny-notification-message {
       background: linear-gradient(135deg, #34d399, #10b981);
       color: white;
+      width: 20% !important; 
+      opacity: 1;
+    }
+    
+    .shiny-notification-error {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      width: 22% !important; 
       opacity: 1;
     }
     
     .shiny-notification-close {
       display: none !important;
     }
+    
+    .login-title {
+      font-size: 28px;
+      color: #333;
+      font-family: PBold;
+    }
+    
+    .login-username {
+      color: #f39c12;
+      font-family: EpicPro;
+      
+    }
+    
+@keyframes bounceLogo {
+  0% {
+    transform: translateY(0) scale(1, 1);
+  }
+
+  15% {
+    transform: translateY(-28px) scale(1.05, 0.95);
+  }
+
+  30% {
+    transform: translateY(-35px) scale(1.03, 0.97);
+  }
+
+  45% {
+    transform: translateY(0) scale(0.95, 1.05);
+  }
+
+  60% {
+    transform: translateY(-12px) scale(1.02, 0.98);
+  }
+
+  80% {
+    transform: translateY(0) scale(0.98, 1.02);
+  }
+
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+
+#animated_logo {
+  animation: bounceLogo 1.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: center bottom;
+}
+
+#login_user:focus,
+#login_pass:focus {
+    outline: 2px solid #f97316 ;  /* orange focus ring */
+    border:none !important;
+    box-shadow: none !important;
+}
+
+.password-wrapper {
+  position: relative;
+  width: 100%;
+  margin-bottom: 30px;
+  margin-top: 5px;
+}
+
+/* give space for the icon */
+.password-wrapper input {
+  padding-right: 46px;
+}
+
+/* SVG eye icon */
+.eye-icon {
+  position: absolute;
+  right: 10px;
+  top: 70%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+.eye-icon:hover {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.08);
+}
+
+#login_btn {
+  background-color: #eb8b2b;
+}
   
 "))
     
@@ -541,143 +646,42 @@ $(document).on('hidden.bs.modal', '.modal', function () {
   $('body').css('padding-right','');
   $('.modal-backdrop').remove();
 });
+
+let showingMainLogo = true;
+
+function bounceAndSwap() {
+  const img = document.getElementById('animated_logo');
+
+  // Restart bounce animation
+  img.style.animation = 'none';
+  img.offsetHeight; // force reflow
+  img.style.animation = 'bounceLogo 1.2s ease';
+
+  // Swap image at peak of bounce
+  setTimeout(() => {
+    img.src = showingMainLogo ? 'logo2.png' : 'logo.png';
+    showingMainLogo = !showingMainLogo;
+  }, 600);
+}
+
+function loopAnimation() {
+  bounceAndSwap();
+
+  // ✅ MAIN LOGO stays long, LOGO2 stays short
+  const delay = showingMainLogo
+    ? 1500   // logo2 → very short
+    : 6500;  // logo → long stay
+
+  setTimeout(loopAnimation, delay);
+}
+
+// Start animation
+setTimeout(loopAnimation, 2000);
 ")),
-  
-  tags$h1("Pet Shop Management System", id = "app_title"),
-  
-  tabsetPanel( id = "tabs",
-               tabPanel(
-                 title = tagList(
-                   icon("tachometer-alt"),  # dashboard icon
-                   span("DASHBOARD")
-                 ),
-      fluidRow(
-        column(4, uiOutput("total_pets")),
-        column(4, uiOutput("available_pets")),
-        column(4, uiOutput("purchased_pets"))
-      )
-    ),
-    
-    tabPanel(
-      title = tagList(
-        icon("paw"),  # pet icon
-        span("PETS")
-      ),
-      fluidRow(
-        style = "margin-top: 5px;",
-        # --- Left Sidebar ---
-        column(
-          width = 3,  # 3/12 of row width
-          wellPanel(
-            class = "sidebar-panel",
-            div(
-              style = "display:flex; align-items:center; gap:10px;",
-              
-              # Add Pet button
-              actionButton(
-                "open_add",
-                "Add Pet",
-                icon = icon("plus"),
-                class = "btn-add"
-              ),
-              
-              # Reset Filter button (middle)
-              actionButton(
-                "reset_filter",
-                label = NULL,
-                icon = tags$img(
-                  src = "icons/resetfilter.svg",
-                  width = "25px",
-                  height = "25px"
-                ),
-                style = "
-      border-radius:10px;
-      background: linear-gradient(to right, #FFC629, #FFD700);
-      border:2px solid white;
-      cursor:pointer;
-      padding: 3px 5px;
-    "
-              ),
-              
-              # Notification wrapper
-              div(
-                style = "position:relative;",
-                
-                actionButton(
-                  "notif_icon",
-                  label = NULL,
-                  icon = tags$img(
-                    src = "icons/lowstock.svg",
-                    width = "45px",
-                    height = "45px"
-                  ),
-                  style = "
-        border-radius:50%;
-        background:transparent;
-        border:none;
-        margin-left: 30px;
-      "
-                ),
-                
-                # Badge (overlapping the icon)
-                tags$span(
-                  id = "notif_count",
-                  textOutput("notif_count_text"),
-                  class = "badge bg-danger",
-                  style = "
-        position:absolute;
-        top:5px;
-        right:2px;
-        background-color:red;
-        font-size:11px;
-        padding:3px 6px;
-        border-radius:50%;
-      "
-                )
-              )
-            ),
-            uiOutput("notif_dropdown"),
-            hr(),
-            h4(
-              tagList(
-                icon("filter"),
-                span("FILTER BY TYPE")
-              )
-            ),
-            checkboxGroupInput("filter_type", NULL,
-                               choices = c("Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster"),
-                               selected = c("Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster")),
-            h4(
-              tagList(
-                icon("filter"),
-                span("FILTER BY GENDER")
-              )
-            ),
-            checkboxGroupInput("filter_gender", NULL,
-                               choices = c("Male", "Female"),
-                               selected = c("Male", "Female")),
-            h4(
-              tagList(
-                icon("filter"),
-                span("FILTER BY STATUS")
-              )
-            ),
-            checkboxGroupInput("filter_status", NULL,
-                               choices = c("Available", "Purchased"),
-                               selected = c("Available", "Purchased"))
-          )
-        ),
-        
-        # --- Table on Right ---
-        column(
-          width = 9,
-          DTOutput("pet_table")
-        )
-      )
-    )
-    
+  uiOutput("page")
   )
-)
+
+  
 
 # ================= SERVER =================
 server <- function(input, output, session) {
@@ -957,6 +961,13 @@ server <- function(input, output, session) {
   temp_image <- reactiveVal(NULL)
   cropped_image <- reactiveVal(NULL)
   
+  USERNAME <- "admin"
+  PASSWORD <- "petopia123"
+  
+  # Login state
+  logged_in <- reactiveVal(NULL)
+  js_ready <- reactiveVal(FALSE)
+
   # Reactive values to store form inputs temporarily
   pet_form <- reactiveValues(
     name = NULL,
@@ -967,6 +978,463 @@ server <- function(input, output, session) {
     status = NULL,
     breed = NULL
   )
+  
+  login_ui <- div(
+    style = "
+    height: 100vh;       /* full viewport height */
+    width: 100vw;        /* full viewport width */
+    margin: 0;
+    padding: 0;
+    position: relative;  /* for absolutely positioned images */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(270deg, #FFEB3B, #FFC629, #FFEB3B, #FFC629, #FFEB3B);
+    background-size: 600% 600%;
+    animation: gradientMove 18s ease infinite;
+  ",
+    
+    tags$style(HTML("
+    @keyframes gradientMove {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+  ")),
+  
+    # Top-left image
+    tags$img(
+      src = "doghead.png",
+      style = "
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 550px;    /* adjust as needed */
+      height: auto;
+      z-index: 1;
+    "
+    ),
+    
+    # Bottom-right image
+    tags$img(
+      src = "dogtail.png",
+      style = "
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 550px;    /* adjust as needed */
+      height: auto;
+      z-index: 1;
+    "
+    ),
+    
+    # Login box container
+    div(
+      style = "
+      display: flex;
+      width: 700px;             /* total width of login box */
+      border-radius: 30px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+      z-index: 2;               /* above the corner images */
+    ",
+      
+      # Left side: image
+      div(
+        style = "
+    width: 50%;
+    border-radius: 30px 0 0 15px;
+    background-color: #E58B2B;
+
+    display: flex;
+    justify-content: center;   /* horizontal center */
+    align-items: center;       /* vertical center */
+    gap: 5px;   
+  ",
+        
+        tags$img(
+          src = "logo.png",
+          id = "animated_logo",
+          style = "
+          height: 60px;
+  "
+        ),
+        
+        tags$img(
+          src = "logotitle.png",
+          style = "
+      width: auto;
+      height: 60px;
+    "
+        )
+      ),
+      
+      # Right side: login form
+      div(
+        style = "
+    width: 50%;
+    background-color: white;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: left;
+    position: relative;   /* needed for absolute child positioning */
+  ",
+        
+        tags$img(
+          src = "storeceiling.png",
+          style = "
+      position: absolute;
+      top: -70px;          /* adjust how far above the box */
+      left: 50%;           /* center horizontally */
+      transform: translateX(-50%);
+      width: 360px;        /* adjust size */
+      height: auto;
+      z-index: 3;          /* above the box */
+    "
+        ),
+        tags$h2(
+          "Welcome back, ",
+          tags$span("Admin !", class = "login-username"),
+          class = "login-title"
+        ),
+        textInput("login_user", "Username", placeholder = "Enter your username"),
+        div(
+          class = "password-wrapper",
+          
+          tags$label(
+            "Password",
+            `for` = "login_pass"   # must match input id
+          ),
+          
+          tags$input(
+            id = "login_pass",
+            type = "password",
+            placeholder = "Enter your password",
+            class = "form-control"
+          ),
+          
+          tags$img(
+            id = "toggle_pass",
+            src = "icons/eye-slash.svg",
+            class = "eye-icon"
+          )
+        ),
+        actionButton("login_btn", "Login", class = "btn btn-warning")
+      )
+    ),
+    tags$script(HTML("
+    const passInput = document.getElementById('login_pass');
+    const toggle = document.getElementById('toggle_pass');
+
+    if (passInput && toggle) {
+      toggle.addEventListener('click', function () {
+        if (passInput.type === 'password') {
+          passInput.type = 'text';
+          toggle.src = 'icons/eye.svg';
+        } else {
+          passInput.type = 'password';
+          toggle.src = 'icons/eye-slash.svg';
+        }
+      });
+    }
+  "))
+  )
+  
+
+  
+  
+  main_ui <- tagList(  
+    div(
+      style = "padding-left: 15px;padding-right: 15px;padding-bottom: 15px;",
+    div(
+      style = "position: relative; width: 100%; text-align: center;",
+      
+      tags$h1(
+        "", 
+        id = "app_title",
+        style = "
+      display: inline-block; 
+      position: relative; 
+      padding: 40px 0;       /* keep your padding */
+      font-size: 36px;
+      color: white;
+      z-index: 900;         /* above curtains */
+    "
+      ),
+      
+      # Center image
+      tags$img(
+        src = "petopia.png",
+        style = "
+      position: absolute;
+      top: 0; 
+      left: 50%; 
+      transform: translateX(-50%);
+      height: 100%;      /* full header height including padding */
+      z-index: 1000;
+      pointer-events: none;
+    "
+      ),
+      
+      # Left curtain
+      tags$img(
+        src = "curtain.png",
+        style = "
+      position: absolute;
+      height: 130px; 
+      top: 20px;          /* match top padding of h1 */
+      bottom: 40px;       /* match bottom padding of h1 */
+      left: 0;
+      z-index: 900;
+      pointer-events: none;
+    "
+      ),
+      
+      # Right curtain
+      tags$img(
+        src = "curtain.png",
+        style = "
+      position: absolute;
+      height: 130px; 
+      top: 20px;          /* match top padding of h1 */
+      bottom: 40px;       /* match bottom padding of h1 */
+      right: 0;
+      transform: scaleX(-1); 
+      z-index: 900;
+      pointer-events: none;
+    "
+      )
+    ),
+    
+    tags$img(
+      src = "catplaying.gif",
+      style = "
+    position: absolute;
+    top:97px;       /* adjust as needed */
+    right: 15px;
+    width: 200px;
+    z-index: 1000;
+    pointer-events: none;
+  "
+    ),
+    
+    actionButton(
+      "logout_btn", "Logout", icon = icon("sign-out-alt"),
+      style = "
+    position: absolute;
+    top: 165px;              /* same vertical position as the GIF */
+    left: 305px;           /* adjust: GIF width + some spacing */
+    z-index: 1001;          /* above background but below the GIF if needed */
+    padding: 5px 12px;
+    border-radius: 10px;
+    background-color: #f39c12;
+    color: white;
+    border: none;
+    cursor: pointer;
+  "
+    ),
+    
+    tabsetPanel(
+      id = "tabs",
+      
+      # ---------- DASHBOARD TAB ----------
+      tabPanel(
+        title = tagList(
+          icon("tachometer-alt"),
+          span("DASHBOARD")
+        ),
+        fluidRow(
+          column(4, uiOutput("total_pets")),
+          column(4, uiOutput("available_pets")),
+          column(4, uiOutput("purchased_pets"))
+        )
+      ),
+      
+      # ---------- PETS TAB ----------
+      tabPanel(
+        title = tagList(
+          icon("paw"),
+          span("PETS")
+        ),
+        fluidRow(
+          style = "margin-top: 5px;",
+          
+          # --- Left Sidebar ---
+          column(
+            width = 3,
+            wellPanel(
+              class = "sidebar-panel",
+              
+              div(
+                style = "display:flex; align-items:center; gap:10px;",
+                
+                actionButton(
+                  "open_add",
+                  "Add Pet",
+                  icon = icon("plus"),
+                  class = "btn-add"
+                ),
+
+                
+                actionButton(
+                  "reset_filter",
+                  label = NULL,
+                  icon = tags$img(
+                    src = "icons/resetfilter.svg",
+                    width = "25px",
+                    height = "25px"
+                  ),
+                  style = "
+                  border-radius:10px;
+                  background: linear-gradient(to right, #FFC629, #FFD700);
+                  border:2px solid white;
+                  cursor:pointer;
+                  padding: 3px 5px;
+                "
+                ),
+                
+                div(
+                  style = "position:relative;",
+                  
+                  actionButton(
+                    "notif_icon",
+                    label = NULL,
+                    icon = tags$img(
+                      src = "icons/lowstock.svg",
+                      width = "45px",
+                      height = "45px"
+                    ),
+                    style = "
+                    border-radius:50%;
+                    background:transparent;
+                    border:none;
+                    margin-left: 30px;
+                  "
+                  ),
+                  
+                  tags$span(
+                    id = "notif_count",
+                    textOutput("notif_count_text"),
+                    class = "badge bg-danger",
+                    style = "
+                    position:absolute;
+                    top:5px;
+                    right:2px;
+                    background-color:red;
+                    font-size:11px;
+                    padding:3px 6px;
+                    border-radius:50%;
+                  "
+                  )
+                )
+              )
+              ,
+              
+              uiOutput("notif_dropdown"),
+              hr(),
+              
+              h4(tagList(icon("filter"), span("FILTER BY TYPE"))),
+              checkboxGroupInput(
+                "filter_type", NULL,
+                choices = c("Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster"),
+                selected = c("Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster")
+              ),
+              
+              h4(tagList(icon("filter"), span("FILTER BY GENDER"))),
+              checkboxGroupInput(
+                "filter_gender", NULL,
+                choices = c("Male", "Female"),
+                selected = c("Male", "Female")
+              ),
+              
+              h4(tagList(icon("filter"), span("FILTER BY STATUS"))),
+              checkboxGroupInput(
+                "filter_status", NULL,
+                choices = c("Available", "Purchased"),
+                selected = c("Available", "Purchased")
+              )
+            )
+          ),
+          
+          # --- Table on Right ---
+          column(
+            width = 9,
+            DTOutput("pet_table")
+          )
+        )
+      )
+    )
+  )
+  )
+  # 1️⃣ JS: check localStorage BEFORE Shiny renders
+  shinyjs::runjs("
+  var loggedIn = localStorage.getItem('logged_in');
+  Shiny.setInputValue('stored_login', loggedIn === 'true', {priority: 'event'});
+")
+  
+  # 2️⃣ Reactively restore login
+  observeEvent(input$stored_login, {
+    logged_in(input$stored_login)
+    js_ready(TRUE)  # now we know login state
+  })
+  
+  # 3️⃣ Render UI only after we know login state
+  output$page <- renderUI({
+    req(js_ready())  # wait until JS has reported login state
+    if (logged_in()) main_ui else login_ui
+  })
+  
+  
+  # 4️⃣ Login button
+  observeEvent(input$login_btn, {
+    if (input$login_user == USERNAME &&
+        input$login_pass == PASSWORD) {
+      
+      logged_in(TRUE)
+      shinyjs::runjs("localStorage.setItem('logged_in', 'true');")
+      
+      # Optionally, show a success notification
+      showNotification(
+        HTML(
+          paste0(
+            '<div style="display:flex; align-items:center; gap:7px;">',
+            '<img src="icons/check.svg" style="width:17px;height:17px;">',
+            '<span style="flex:1; font-family:PSemiBold;">Login successful!</span>',
+            '<button onclick="$(this).closest(\'.shiny-notification\').remove()" ',
+            'style="background:none;border:none;cursor:pointer;margin-bottom:2px;">',
+            '<img src="icons/close.svg" style="width:12px;height:12px;">',
+            '</button>',
+            '</div>'
+          )
+        ),
+        type = "message"
+      )
+    } else {
+      # Show login error as a notification
+      showNotification(
+        HTML(
+          paste0(
+            '<div style="display:flex; align-items:center; gap:7px;">',
+            '<img src="icons/error.svg" style="width:17px;height:17px;">',
+            '<span style="flex:1; font-family:PSemiBold;">Invalid username or password!</span>',
+            '<button onclick="$(this).closest(\'.shiny-notification\').remove()" ',
+            'style="background:none;border:none;cursor:pointer;margin-bottom:2px;">',
+            '<img src="icons/close.svg" style="width:12px;height:12px;">',
+            '</button>',
+            '</div>'
+          )
+        ),
+        type = "error"
+      )    }
+  })
+  
+  
+  # 5️⃣ Logout button
+  observeEvent(input$logout_btn, {
+    logged_in(FALSE)
+    shinyjs::runjs("localStorage.removeItem('logged_in');")
+  })
   
   # ---------- ADD PET MODAL ----------
   showAddPetModal <- function(cropped = NULL) {
@@ -1548,14 +2016,26 @@ observe({
       loadPets()
       loadPetAdditionalInfos()
       
-      showNotification("Pet deleted successfully!", type = "message")
+      showNotification(
+        HTML(
+          paste0(
+            '<div style="display:flex; align-items:center; gap:7px;">',
+            '<img src="icons/check.svg" style="width:17px;height:17px;">',
+            '<span style="flex:1; font-family:PSemiBold;">Pet deleted successfully!</span>',
+            '<button onclick="$(this).closest(\'.shiny-notification\').remove()" ',
+            'style="background:none;border:none;cursor:pointer;margin-bottom:2px;">',
+            '<img src="icons/close.svg" style="width:12px;height:12px;">',
+            '</button>',
+            '</div>'
+          )
+        ),
+        type = "message"
+      )
       
     }, error = function(e) {
       showNotification(paste("Error deleting pet:", e$message), type = "error")
     })
   })
-  
-  
 }
 
 shinyApp(ui, server)
