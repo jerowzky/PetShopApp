@@ -648,35 +648,53 @@ $(document).on('hidden.bs.modal', '.modal', function () {
 });
 
 let showingMainLogo = true;
+let bounceTimer = null;
 
-function bounceAndSwap() {
-  const img = document.getElementById('animated_logo');
+function bounceAndSwap(img) {
+  if (!img) return;
 
-  // Restart bounce animation
   img.style.animation = 'none';
   img.offsetHeight; // force reflow
-  img.style.animation = 'bounceLogo 1.2s ease';
+  img.style.animation = 'bounceLogo 1.2s cubic-bezier(.34,1.56,.64,1)';
 
-  // Swap image at peak of bounce
   setTimeout(() => {
     img.src = showingMainLogo ? 'logo2.png' : 'logo.png';
     showingMainLogo = !showingMainLogo;
   }, 600);
 }
 
-function loopAnimation() {
-  bounceAndSwap();
+function startLogoLoop() {
+  const img = document.getElementById('animated_logo');
+  if (!img) return;
 
-  // ✅ MAIN LOGO stays long, LOGO2 stays short
-  const delay = showingMainLogo
-    ? 1500   // logo2 → very short
-    : 6500;  // logo → long stay
+  // clear old loop
+  if (bounceTimer) clearTimeout(bounceTimer);
 
-  setTimeout(loopAnimation, delay);
+  function loop() {
+    bounceAndSwap(img);
+
+    const delay = showingMainLogo
+      ? 1500   // logo2 short
+      : 6500;  // main logo long
+
+    bounceTimer = setTimeout(loop, delay);
+  }
+
+  loop();
 }
 
-// Start animation
-setTimeout(loopAnimation, 2000);
+/* 🔥 Watch DOM for logo re-appearing */
+const observer = new MutationObserver(() => {
+  const img = document.getElementById('animated_logo');
+  if (img) {
+    startLogoLoop();
+  }
+});
+
+observer.observe(document.body, {
+  childList: true,
+  subtree: true
+});
 
 document.addEventListener('click', function (e) {
   if (e.target && e.target.id === 'toggle_pass') {
