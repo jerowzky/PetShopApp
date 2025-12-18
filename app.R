@@ -485,7 +485,7 @@ ul.nav.nav-tabs > li.active > a {
     .shiny-notification-message {
       background: linear-gradient(135deg, #34d399, #10b981);
       color: white;
-      width: 20% !important; 
+      width: 21% !important; 
       opacity: 1;
     }
     
