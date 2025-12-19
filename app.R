@@ -976,7 +976,7 @@ server <- function(input, output, session) {
         div(
           style = "display:flex; align-items:center; gap:10px; margin-bottom:12px;
                  padding:12px; border:1px solid #8e44ad; border-radius:8px; background:#f3e8fd;",
-          tags$img(src = "icons/summary.svg", width = 24, height = 24),
+          tags$img(src = "icons/recommendation.svg", width = 24, height = 24),
           div(paste(
             "In summary, it is recommended to restock",
             format_types(restock_types),
