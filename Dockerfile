@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install R packages
-RUN R -e "install.packages(c('shiny','DBI','RSQLite','DT','dplyr','base64enc','shinyFeedback','shinyjs'), repos='https://cloud.r-project.org')"
+RUN R -e "install.packages(c('shiny','DBI','RSQLite','DT','dplyr','base64enc','shinyFeedback','shinyjs','plotly'), repos='https://cloud.r-project.org')"
 
 # Copy your app
 COPY . /srv/shiny-server/

@@ -468,6 +468,8 @@ ul.nav.nav-tabs > li.active > a {
       right: 5px !important;
       bottom: auto !important;
       animation: slideInLeft 0.3s ease-out;
+       min-width: 200px;  
+       max-width: 400px; 
     }
     
     @keyframes slideInLeft {
@@ -484,15 +486,13 @@ ul.nav.nav-tabs > li.active > a {
     
     .shiny-notification-message {
       background: linear-gradient(135deg, #34d399, #10b981);
-      color: white;
-      width: 21% !important; 
+      color: white;      
       opacity: 1;
     }
     
     .shiny-notification-error {
       background: linear-gradient(135deg, #ef4444, #dc2626);
       color: white;
-      width: 22% !important; 
       opacity: 1;
     }
     
@@ -774,7 +774,238 @@ server <- function(input, output, session) {
         div("PURCHASED", class = "stat-label"))
   })
   
-
+  output$pet_donut <- renderPlotly({
+    req(pets_data())  # Ensure data is loaded
+    
+    all_types <- c("Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster")
+    
+    # Count available pets by type
+    pet_summary <- pets_data() %>%
+      filter(status == "Available") %>%
+      count(type) %>%
+      right_join(tibble(type = all_types), by = "type") %>%
+      mutate(n = ifelse(is.na(n), 0, n))
+    
+    # Define custom colors for each pet type
+    pet_colors <- c(
+      "Dog" = "#FFDA4D",
+      "Cat" = "#fbca43",
+      "Bird" = "#f7ba3b",
+      "Fish" = "#f2aa34",
+      "Rabbit" = "#ec9b2f",
+      "Hamster" = "#e58b2b"
+    )
+    
+    plot_ly(
+      pet_summary,
+      labels = ~type,
+      values = ~n,
+      type = 'pie',
+      hole = 0.6,
+      textinfo = 'label+percent',
+      textposition = 'inside',
+      textfont = list(
+        family = "PSemiBold",
+        size = 12,
+        color = "white"
+      ),
+      marker = list(colors = pet_colors[pet_summary$type]),
+      hovertemplate = paste(
+        "&nbsp;&nbsp;&nbsp;%{label}&nbsp;&nbsp;<br>",
+        "&nbsp;&nbsp;%{value} %{customdata}&nbsp;&nbsp;<br>",
+        "&nbsp;&nbsp;%{percent}&nbsp;&nbsp;"
+      ),
+      customdata = ifelse(pet_summary$n == 1, "stock", "stocks"),
+      hoverlabel = list(
+        font = list(
+          family = "PMedium",
+          size = 14,
+          color = "white"
+        ),
+        bgcolor = "#E58B2B",
+        bordercolor = "white",
+        borderradius = 8
+      ),
+      showlegend = TRUE,
+      name = "Pet Stock" # <-- Important: set to NULL to remove Trace 0
+    ) %>%
+      layout(
+        title = list(
+          text = "Current Pet Stock by Type",
+          font = list(
+            family = "EpicPro",
+            size = 22,
+            color = "#E58B2B"
+          ),
+          x = 0.45,
+          xanchor = "center"
+        ),
+        margin = list(t = 60),
+        legend = list(
+          font = list(
+            family = "PSemiBold",
+            size = 14,
+            color = "#E58B2B"
+          )
+        )
+      )
+  })
+  
+  output$pet_analysis <- renderUI({
+    req(pets_data())
+    
+    all_types <- c("Dog", "Cat", "Bird", "Fish", "Rabbit", "Hamster")
+    
+    pet_summary <- pets_data() %>%
+      filter(status == "Available") %>%
+      count(type) %>%
+      right_join(tibble(type = all_types), by = "type") %>%
+      mutate(n = ifelse(is.na(n), 0, n))
+    
+    # Grammar helpers
+    is_are <- function(n) ifelse(n == 1, "is", "are")
+    pluralize <- function(n, word) ifelse(n == 1, word, paste0(word, "s"))
+    format_types <- function(x) {
+      if (length(x) == 0) return(NULL)
+      if (length(x) == 1) return(x)
+      paste(paste(x[-length(x)], collapse = ", "), "and", x[length(x)])
+    }
+    format_count_types <- function(df) {
+      parts <- mapply(
+        function(n, type) {
+          paste0(n, " ", pluralize(n, "pet"), " for ", type)
+        },
+        df$n, df$type
+      )
+      format_types(parts)
+    }
+    
+    # Stock groups
+    empty_stock <- pet_summary %>% filter(n == 0) %>% pull(type)
+    low_stock <- pet_summary %>% filter(n > 0 & n <= 5)
+    sufficient_stock <- pet_summary %>% filter(n > 5 & n <= 20)
+    high_stock <- pet_summary %>% filter(n > 20)
+    
+    # Create sentence containers
+    ui_sentences <- list()
+    
+    # Empty stock
+    if (length(empty_stock) > 0) {
+      ui_sentences <- append(ui_sentences, list(
+        div(
+          style = "display:flex; align-items:center; gap:10px; margin-bottom:12px;
+                 padding:12px;border:1px solid #e74c3c; border-left: 3px solid #e74c3c;border-radius:8px; background:#fdecea;color:#e74c3c; font-family: PMedium",
+          tags$img(src = "icons/empty.svg", width = 24, height = 24),
+          div(paste("Currently, there are no available pets for", format_types(empty_stock), "."))
+        )
+      ))
+    }
+    
+    # Low stock
+    if (nrow(low_stock) > 0) {
+      ui_sentences <- append(ui_sentences, list(
+        div(
+          style = "display:flex; align-items:center; gap:10px; margin-bottom:12px;
+                 padding:12px; border:1px solid #f39c12;border-left:3px solid #f39c12; border-radius:8px; background:#fff3e0;color:#f39c12;font-family:PMedium;",
+          tags$img(src = "icons/low.svg", width = 24, height = 24),
+          div(paste(
+            "There", is_are(sum(low_stock$n)),
+            format_count_types(low_stock),
+            ", which", is_are(nrow(low_stock)),
+            "considered low and should be restocked soon."
+          ))
+        )
+      ))
+    }
+    
+    # Sufficient stock
+    if (nrow(sufficient_stock) > 0) {
+      ui_sentences <- append(ui_sentences, list(
+        div(
+          style = "display:flex; align-items:center; gap:10px; margin-bottom:12px;
+                 padding:12px; border:1px solid #27ae60;border-left:3px solid #27ae60; border-radius:8px; background:#eafaf1;color:#27ae60;font-family:PMedium;",
+          tags$img(src = "icons/sufficient.svg", width = 24, height = 24),
+          div(paste(
+            "There", is_are(sum(sufficient_stock$n)),
+            format_count_types(sufficient_stock),
+            ", which", is_are(nrow(sufficient_stock)),
+            "sufficient and do not require immediate action."
+          ))
+        )
+      ))
+    }
+    
+    # High stock
+    if (nrow(high_stock) > 0) {
+      ui_sentences <- append(ui_sentences, list(
+        div(
+          style = "display:flex; align-items:center; gap:10px; margin-bottom:12px;
+                 padding:12px; border:1px solid #2980b9; border-radius:8px; background:#e8f5fd;",
+          tags$img(src = "icons/high.svg", width = 24, height = 24),
+          div(paste(
+            "There", is_are(sum(high_stock$n)),
+            format_count_types(high_stock),
+            ", which", is_are(nrow(high_stock)),
+            "high; promoting them for adoption or sale is recommended."
+          ))
+        )
+      ))
+    }
+    
+    # Summary
+    restock_types <- c(empty_stock, low_stock$type)
+    maintain_types <- c(sufficient_stock$type, high_stock$type)
+    
+    if (length(restock_types) > 0 && length(maintain_types) > 0) {
+      ui_sentences <- append(ui_sentences, list(
+        div(
+          style = "display:flex; align-items:center; gap:10px; margin-bottom:12px;
+                 padding:12px; border:1px solid #8e44ad;border-left:3px solid #8e44ad; border-radius:8px; background:#f3e8fd;color:#8e44ad;font-family:PMedium;",
+          tags$img(src = "icons/recommendation.svg", width = 24, height = 24),
+          div(paste(
+            "In summary, it is recommended to restock",
+            format_types(restock_types),
+            ", while the stock for",
+            format_types(maintain_types),
+            "can be maintained."
+          ))
+        )
+      ))
+    } else if (length(restock_types) > 0) {
+      ui_sentences <- append(ui_sentences, list(
+        div(
+          style = "display:flex; align-items:center; gap:10px; margin-bottom:12px;
+                 padding:12px; border:1px solid #8e44ad; border-radius:8px; background:#f3e8fd;",
+          tags$img(src = "icons/summary.svg", width = 24, height = 24),
+          div(paste(
+            "In summary, it is recommended to restock",
+            format_types(restock_types),
+            "."
+          ))
+        )
+      ))
+    } else if (length(maintain_types) > 0) {
+      ui_sentences <- append(ui_sentences, list(
+        div(
+          style = "display:flex; align-items:center; gap:10px; margin-bottom:12px;
+                 padding:12px; border:1px solid #8e44ad; border-radius:8px; background:#f3e8fd;",
+          tags$img(src = "icons/summary.svg", width = 24, height = 24),
+          div(paste(
+            "In summary, the stock for",
+            format_types(maintain_types),
+            "is sufficient and can be maintained."
+          ))
+        )
+      ))
+    }
+    
+    # Main container
+    div(
+      style = "padding:20px; background:white; display:flex; flex-direction:column; gap:10px;",
+      ui_sentences
+    )
+  })
+  
   output$notif_count_text <- renderText({
     nrow(notif_data())
   })
@@ -843,7 +1074,10 @@ server <- function(input, output, session) {
   # ---------- PET TABLE ----------
   output$pet_table <- renderDT({
     input$reload_pets
+    raw_data <- pets_data()
+    db_is_empty <- nrow(raw_data) == 0
     
+    if (!db_is_empty) {
     filtered_data <- pets_data() %>%
       filter(
         type %in% input$filter_type,
@@ -938,7 +1172,23 @@ server <- function(input, output, session) {
         AddedOn,
         AddedOn_raw,
         Actions
-      )
+      )   } else {
+        # 👇 Only here we force empty table
+        filtered_data <- data.frame(
+          PetID = character(),
+          PetProfile = character(),
+          PetName = character(),
+          Breed = character(),
+          gender = character(),
+          price = numeric(),
+          Status = character(),
+          AddedOn = character(),
+          AddedOn_raw = as.POSIXct(character()),
+          Actions = character(),
+          stringsAsFactors = FALSE
+        )
+      }
+    filtered_empty <- !db_is_empty && nrow(filtered_data) == 0
     
     datatable(
       filtered_data,
@@ -968,13 +1218,34 @@ server <- function(input, output, session) {
         order = list(list(8, "desc")),  # newest first
         language = list(
           zeroRecords = HTML(
-            " <div style='width:100vw; margin-left:calc(-50vw + 50%); padding:20px; text-align:center; background-color:white;'> 
-        <img src='corgisleeping.gif' style='margin-bottom:0rem; width:auto; height:16rem;'> 
+            " <div style='width:100vw; margin-left:calc(-50vw + 50%); padding:30px; text-align:center; background-color:white;'> 
+        <img src='corgisleeping2.gif' style='margin-bottom:0rem; width:auto; height:14rem;'> 
         <p style='font-size:2.5rem; font-family:PExBold; color:#374151; margin-bottom:0.2rem; text-align:center;'>No pets match your search</p> 
         <p style='font-size:1.3rem; font-family:PMedium; color:#6b7280; margin-bottom:1rem; text-align:center;'>It looks like your search or filter didn’t match any existing pets</p> 
         <button onclick='Shiny.setInputValue(\"reload_pets\", Math.random(), {priority:\"event\"})' style='font-family:PSemiBold; display:inline-flex; align-items:center; background: linear-gradient(to right, #fcd34d, #f97316); color:white; padding:0.5rem 1.5rem; border-radius:9999px; box-shadow:0 2px 4px rgba(0,0,0,0.15); transition:all 0.3s ease; gap:0.5rem; border:none; cursor:pointer; font-size:1.5rem;'> 
           <img src='icons/reload2.svg' width='16' height='16'> Reload 
       </div> "
+          ),
+          emptyTable = HTML(
+            if (filtered_empty) {
+              "
+      <div style='width:100vw; margin-left:calc(-50vw + 50%); padding:30px; text-align:center; background-color:white;'> 
+        <img src='corgisleeping2.gif' style='margin-bottom:0rem; width:auto; height:14rem;'> 
+        <p style='font-size:2.5rem; font-family:PExBold; color:#374151; margin-bottom:0.2rem; text-align:center;'>No pets match your search</p> 
+        <p style='font-size:1.3rem; font-family:PMedium; color:#6b7280; margin-bottom:1rem; text-align:center;'>It looks like your search or filter didn’t match any existing pets</p> 
+        <button onclick='Shiny.setInputValue(\"reload_pets\", Math.random(), {priority:\"event\"})' style='font-family:PSemiBold; display:inline-flex; align-items:center; background: linear-gradient(to right, #fcd34d, #f97316); color:white; padding:0.5rem 1.5rem; border-radius:9999px; box-shadow:0 2px 4px rgba(0,0,0,0.15); transition:all 0.3s ease; gap:0.5rem; border:none; cursor:pointer; font-size:1.5rem;'> 
+          <img src='icons/reload2.svg' width='16' height='16'> Reload 
+      </div>
+      "
+            } else {
+              "
+      <div style='padding:3rem;text-align:center;'>
+        <img src='sadpet.png' height='180'>
+        <h2>No Pets Yet</h2>
+        <p>Your pet database is empty.</p>
+      </div>
+      "
+            }
           )
         )
       )
@@ -1267,6 +1538,17 @@ server <- function(input, output, session) {
           column(4, uiOutput("total_pets")),
           column(4, uiOutput("available_pets")),
           column(4, uiOutput("purchased_pets"))
+        ),
+        hr(),
+        fluidRow(
+          column(
+            6,
+            plotlyOutput("pet_donut")   # Donut chart here
+          ),
+          column(
+            6,
+            uiOutput("pet_analysis")    # Description/analysis here
+          )
         )
       ),
       
