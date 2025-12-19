@@ -975,7 +975,7 @@ server <- function(input, output, session) {
       ui_sentences <- append(ui_sentences, list(
         div(
           style = "display:flex; align-items:center; gap:10px; margin-bottom:12px;
-                 padding:12px; border:1px solid #8e44ad; border-radius:8px; background:#f3e8fd;",
+                 padding:12px; border:1px solid #8e44ad;border-left:3px solid #8e44ad; border-radius:8px; background:#f3e8fd;color:#8e44ad;font-family:PMedium;",
           tags$img(src = "icons/recommendation.svg", width = 24, height = 24),
           div(paste(
             "In summary, it is recommended to restock",
