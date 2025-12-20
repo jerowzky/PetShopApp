@@ -2147,7 +2147,7 @@ observe({
           title = "Preview & Crop Image",
           div(
             id = "cropper_container",
-            style = "width:100% !important; height: 100% !important; display:block; padding:0; margin:0;",
+            style = "width:100% !important; height: 60vh !important; display:block; padding:0; margin:0;",
             tags$img(
               id = "cropper_preview",
               src = img_base64,
