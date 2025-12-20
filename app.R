@@ -44,25 +44,63 @@ ui <- fluidPage(
       height: 100%;
       width: 100%;
     }
-  .stat-box {
-    background: #ffc629;
-    padding: 25px;
-    border-radius: 10px;
-    text-align: center;
-    color: white;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.15);
-    margin-bottom: 20px;
-  }
+.stat-box {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(to left, #FFc629, #E58B2B, #E58B2B);
+  border-radius: 16px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
 
-  .stat-number {
-    font-size: 40px;
-    font-weight: bold;
-  }
+/* ICON ON THE LEFT */
+.stat-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #FFD700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: white;
+  flex-shrink: 0; /* prevents icon from shrinking */
+}
 
-  .stat-label {
-    letter-spacing: 1px;
-    font-size: 14px;
-  }
+/* CONTENT ON THE RIGHT */
+.stat-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* VALUE */
+.stat-number {
+  font-family: PSemiBold;
+  font-size: 26px;
+  color: white;
+  line-height: 1.1;
+}
+
+/* LABEL */
+.stat-label {
+  font-family: EpicPro;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: white;
+  text-transform: uppercase;
+}
+
+/* STATUS COLORS */
+.stat-box.available .stat-icon {
+  background: #FFD700;
+}
+
+.stat-box.purchased .stat-icon {
+  background: #FFD700;
+}
+
 
   @font-face {
     font-family: 'SuperAdorable';
@@ -150,10 +188,19 @@ ui <- fluidPage(
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
   }
 
-  .btn-delete:hover {
+  .btn-delete:hover, .btn-delete2:hover {
     background-color: #D85A5A;
     color: white !important;
   }
+  
+  .btn-delete2 {
+    background-color: #F46A6A;
+    color: white;
+    border: none;
+    padding: 8px 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  }
+
 
   table.dataTable.stripe tbody tr.odd {
     background-color: #FFFDE7;
@@ -215,6 +262,12 @@ ui <- fluidPage(
     padding: 4px 8px;
     font-family: 'PSemiBold';
     font-size: 13px;
+}
+
+.dataTables_wrapper .dataTables_filter input:focus,
+.dataTables_wrapper .dataTables_length select:focus {
+    outline: none;                 /* remove default blue outline */
+    border-color: #E58B2B !important;
 }
   .shiny-input-container label {
     color: black;
@@ -401,17 +454,21 @@ ul.nav.nav-tabs > li.active > a {
     }
 
   
-    #modal1 .modal-header, #modal2 .modal-header {
+    #modal1 .modal-header, #modal2 .modal-header, #modal3 .modal-header {
       background: linear-gradient(to left, #fcd34d, #f97316);
       padding: 15px 20px; 
       border-top-left-radius: 12px;
       border-top-right-radius: 12px;
     }
+    
+    #modal3 .modal-header {
+      background: #F46A6A;
+    }
   
-    #modal1 .modal-header .modal-title, #modal2 .modal-header .modal-title {
+    #modal1 .modal-header .modal-title, #modal2 .modal-header .modal-title, #modal3 .modal-header .modal-title {
       font-size: 2.2rem;      /* adjust as needed */
       font-family: 'EpicPro';
-      letter-spacing: 2px;
+      letter-spacing: 1px;
       color: white;
     }
   
@@ -420,7 +477,7 @@ ul.nav.nav-tabs > li.active > a {
 
     }
   
-    #modal1 .modal-content, #modal2 .modal-content {
+    #modal1 .modal-content, #modal2 .modal-content, #modal3 .modal-content {
       border-radius: 12px;
       }
     
@@ -442,6 +499,7 @@ ul.nav.nav-tabs > li.active > a {
   #modal1 .shiny-file-input:focus {
     outline: 2px solid #f97316 ;  /* orange focus ring */
     border:none !important;
+    color: black;
     box-shadow: none !important;
   }
   
@@ -449,6 +507,7 @@ ul.nav.nav-tabs > li.active > a {
   outline: 2px solid #f97316 !important;
   border: none !important;
   box-shadow: none !important;
+  color: black;
 }
 
 .notif-icon {
@@ -552,6 +611,7 @@ ul.nav.nav-tabs > li.active > a {
     outline: 2px solid #f97316 ;  /* orange focus ring */
     border:none !important;
     box-shadow: none !important;
+    color:black;
 }
 
 .password-wrapper {
@@ -586,6 +646,8 @@ ul.nav.nav-tabs > li.active > a {
 
 #login_btn {
   background-color: #eb8b2b;
+  font-family: EpicPro;
+  letter-spacing: 1px;
 }
   
 "))
@@ -711,6 +773,14 @@ document.addEventListener('click', function (e) {
   }
 });
 
+  document.addEventListener('click', function(event) {
+    var dropdown = document.getElementById('notif_dropdown');
+    var button = document.getElementById('notif_icon');
+    if(dropdown && button && !dropdown.contains(event.target) && !button.contains(event.target)) {
+      Shiny.setInputValue('close_notif_dropdown', Math.random());
+    }
+  });
+
 ")),
   uiOutput("page")
   )
@@ -758,20 +828,38 @@ server <- function(input, output, session) {
   # ---------- DASHBOARD ----------
   output$total_pets <- renderUI({
     div(class = "stat-box",
-        div(nrow(pets_data()), class = "stat-number"),
-        div("TOTAL PETS", class = "stat-label"))
+        div(class = "stat-icon",
+            icon("paw")
+        ),
+        div(class = "stat-content",
+            div(nrow(pets_data()), class = "stat-number"),
+            div("TOTAL PETS", class = "stat-label")
+        )
+    )
   })
   
   output$available_pets <- renderUI({
-    div(class = "stat-box",
-        div(sum(pets_data()$status == "Available"), class = "stat-number"),
-        div("AVAILABLE", class = "stat-label"))
+    div(class = "stat-box available",
+        div(class = "stat-icon",
+            icon("check-circle")
+        ),
+        div(class = "stat-content",
+            div(sum(pets_data()$status == "Available"), class = "stat-number"),
+            div("AVAILABLE", class = "stat-label")
+        )
+    )
   })
   
   output$purchased_pets <- renderUI({
-    div(class = "stat-box",
-        div(sum(pets_data()$status == "Purchased"), class = "stat-number"),
-        div("PURCHASED", class = "stat-label"))
+    div(class = "stat-box purchased",
+        div(class = "stat-icon",
+            icon("shopping-cart")
+        ),
+        div(class = "stat-content",
+            div(sum(pets_data()$status == "Purchased"), class = "stat-number"),
+            div("PURCHASED", class = "stat-label")
+        )
+    )
   })
   
   output$pet_donut <- renderPlotly({
@@ -786,15 +874,35 @@ server <- function(input, output, session) {
       right_join(tibble(type = all_types), by = "type") %>%
       mutate(n = ifelse(is.na(n), 0, n))
     
-    # Define custom colors for each pet type
-    pet_colors <- c(
-      "Dog" = "#FFDA4D",
-      "Cat" = "#fbca43",
-      "Bird" = "#f7ba3b",
-      "Fish" = "#f2aa34",
-      "Rabbit" = "#ec9b2f",
-      "Hamster" = "#e58b2b"
-    )
+    # Check if all counts are zero
+    if (all(pet_summary$n == 0)) {
+      # Show a single gray slice for empty state
+      pet_summary <- tibble(
+        type = "No pets",
+        n = 1
+      )
+      pet_colors <- c("No pets" = "#d1d5db")  # gray
+      text_info <- "none"  # can also set to "none" if you don't want text
+      hover_info <- "none"  # disable hover info
+      hover_template <- " 0 stock "
+      show_legend <- FALSE
+    } else {
+      pet_colors <- c(
+        "Dog" = "#FFDA4D",
+        "Cat" = "#fbca43",
+        "Bird" = "#f7ba3b",
+        "Fish" = "#f2aa34",
+        "Rabbit" = "#ec9b2f",
+        "Hamster" = "#e58b2b"
+      )
+      text_info <- "label+percent"
+      hover_template <- paste(
+        "&nbsp;&nbsp;&nbsp;%{label}&nbsp;&nbsp;<br>",
+        "&nbsp;&nbsp;%{value} %{customdata}&nbsp;&nbsp;<br>",
+        "&nbsp;&nbsp;%{percent}&nbsp;&nbsp;"
+      )
+      show_legend <- TRUE
+    }
     
     plot_ly(
       pet_summary,
@@ -802,19 +910,18 @@ server <- function(input, output, session) {
       values = ~n,
       type = 'pie',
       hole = 0.6,
-      textinfo = 'label+percent',
+      domain = list( 
+        x = c(0, 0.8), 
+        y = c(0, 1) ),
+      textinfo = text_info,
       textposition = 'inside',
       textfont = list(
         family = "PSemiBold",
-        size = 12,
+        size = 13,
         color = "white"
       ),
       marker = list(colors = pet_colors[pet_summary$type]),
-      hovertemplate = paste(
-        "&nbsp;&nbsp;&nbsp;%{label}&nbsp;&nbsp;<br>",
-        "&nbsp;&nbsp;%{value} %{customdata}&nbsp;&nbsp;<br>",
-        "&nbsp;&nbsp;%{percent}&nbsp;&nbsp;"
-      ),
+      hovertemplate = hover_template,
       customdata = ifelse(pet_summary$n == 1, "stock", "stocks"),
       hoverlabel = list(
         font = list(
@@ -826,12 +933,12 @@ server <- function(input, output, session) {
         bordercolor = "white",
         borderradius = 8
       ),
-      showlegend = TRUE,
-      name = "Pet Stock" # <-- Important: set to NULL to remove Trace 0
+      showlegend = show_legend,
+      name = "Pet Stock"
     ) %>%
       layout(
         title = list(
-          text = "Current Pet Stock by Type",
+          text = if (all(pet_summary$n == 0)) "No pets available" else "Current Pet Stock by Type",
           font = list(
             family = "EpicPro",
             size = 22,
@@ -842,6 +949,10 @@ server <- function(input, output, session) {
         ),
         margin = list(t = 60),
         legend = list(
+          x = 0.78,
+          y = 0.5,
+          xanchor = "left",
+          yanchor = "middle",
           font = list(
             family = "PSemiBold",
             size = 14,
@@ -850,6 +961,7 @@ server <- function(input, output, session) {
         )
       )
   })
+  
   
   output$pet_analysis <- renderUI({
     req(pets_data())
@@ -940,7 +1052,7 @@ server <- function(input, output, session) {
       ui_sentences <- append(ui_sentences, list(
         div(
           style = "display:flex; align-items:center; gap:10px; margin-bottom:12px;
-                 padding:12px; border:1px solid #2980b9; border-radius:8px; background:#e8f5fd;",
+                 padding:12px; border:1px solid #2980b9;border-left:3px solid #2980b9; border-radius:8px; background:#e8f5fd;color:#2980b9;font-family:PMedium;",
           tags$img(src = "icons/high.svg", width = 24, height = 24),
           div(paste(
             "There", is_are(sum(high_stock$n)),
@@ -988,8 +1100,8 @@ server <- function(input, output, session) {
       ui_sentences <- append(ui_sentences, list(
         div(
           style = "display:flex; align-items:center; gap:10px; margin-bottom:12px;
-                 padding:12px; border:1px solid #8e44ad; border-radius:8px; background:#f3e8fd;",
-          tags$img(src = "icons/summary.svg", width = 24, height = 24),
+                 padding:12px; border:1px solid #8e44ad;border-left:3px solid #8e44ad; border-radius:8px; background:#f3e8fd;color:#8e44ad;font-family:PMedium;",
+          tags$img(src = "icons/recommendation.svg", width = 24, height = 24),
           div(paste(
             "In summary, the stock for",
             format_types(maintain_types),
@@ -1010,28 +1122,53 @@ server <- function(input, output, session) {
     nrow(notif_data())
   })
   
+  output$notif_count_ui <- renderUI({
+    count <- nrow(notif_data())  # or however you calculate notifications
+    
+    if(count == 0) return(NULL)  # hide completely if 0
+    
+    tags$span(
+      count,
+      class = "badge bg-danger",
+      style = "
+      position: absolute;
+      top: 5px;
+      right: 2px;
+      background-color: red;
+      font-size: 11px;
+      width: 20px;           /* fixed width */
+      height: 20px;          /* fixed height */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;     /* perfect circle */
+    "
+    )
+  })
+  
+  
   output$notif_dropdown <- renderUI({
     if (!notif_visible()) return(NULL)
     
     notifs <- notif_data()
-    if (nrow(notifs) == 0) return(NULL)
     
-    tags$div(
-      style = "
-      position:absolute;
-      left:280px;
-      top:65px;
-      width:260px;
-      max-height:400px;
-      overflow-y:auto;
-      background:white;
-      border:2px solid #f51a01;
-      border-radius:8px;
-      box-shadow:0 2px 5px rgba(0,0,0,0.2);
-      z-index:999;
-    ",
-      
-      lapply(seq_len(nrow(notifs)), function(i) {
+    # Determine border color and content
+    if(nrow(notifs) == 0){
+      border_color <- "#22c55e"  # green
+      content <- tags$div(
+        style = "
+        padding: 20px;
+        text-align: center;
+        font-family: Poppins;
+        font-size: 14px;
+        color: #22c55e;
+      ",
+        tags$strong("All stocks are sufficient!"),
+        tags$div("No low-stock pets at the moment.")
+      )
+    } else {
+      border_color <- "#f51a01"  # red
+      content <- lapply(seq_len(nrow(notifs)), function(i) {
         tags$div(
           style = "
           padding:10px;
@@ -1040,8 +1177,6 @@ server <- function(input, output, session) {
           align-items:center;
           gap:10px;
         ",
-          
-          # ---- ICON ----
           tags$img(
             src   = petIconPath(notifs$type[i]),
             class = paste(
@@ -1049,8 +1184,6 @@ server <- function(input, output, session) {
               paste0("icon-", tolower(notifs$type[i]))
             )
           ),
-          
-          # ---- TEXT ----
           tags$div(
             style = "
             font-family:Poppins;
@@ -1066,10 +1199,33 @@ server <- function(input, output, session) {
           )
         )
       })
+    }
+    
+    tags$div(
+      id = "notif_dropdown",
+      style = paste0("
+      position:absolute;
+      left:280px;
+      top:65px;
+      white-space: nowrap;
+      overflow: hidden;
+      max-width:300px;
+      max-height:400px;
+      overflow-y:auto;
+      background:white;
+      border:2px solid ", border_color, ";
+      border-radius:8px;
+      box-shadow:0 2px 5px rgba(0,0,0,0.2);
+      z-index:999;
+    "),
+      content
     )
   })
   
   
+  observeEvent(input$close_notif_dropdown, {
+    notif_visible(FALSE)
+  })
   
   # ---------- PET TABLE ----------
   output$pet_table <- renderDT({
@@ -1239,10 +1395,12 @@ server <- function(input, output, session) {
       "
             } else {
               "
-      <div style='padding:3rem;text-align:center;'>
-        <img src='sadpet.png' height='180'>
-        <h2>No Pets Yet</h2>
-        <p>Your pet database is empty.</p>
+      <div style='width:100vw; margin-left:calc(-50vw + 50%); padding:30px; text-align:center; background-color:white;'> 
+        <img src='corgibox2.gif' style='margin-bottom:0rem; width:auto; height:14rem;'> 
+        <p style='font-size:2.5rem; font-family:PExBold; color:#374151; margin-bottom:0.2rem; text-align:center;'>No pets in inventory</p> 
+        <p style='font-size:1.3rem; font-family:PMedium; color:#6b7280; margin-bottom:1rem; text-align:center;'>No pets are currently in the inventory—add one to begin management.</p> 
+        <button onclick='Shiny.setInputValue(\"open_add\", Math.random(), {priority:\"event\"})' style='font-family:PSemiBold; display:inline-flex; align-items:center; background: linear-gradient(to right, #fcd34d, #f97316); color:white; padding:0.5rem 1.5rem; border-radius:9999px; box-shadow:0 2px 4px rgba(0,0,0,0.15); transition:all 0.3s ease; gap:0.5rem; border:none; cursor:pointer; font-size:1.5rem;'> 
+          <img src='icons/addicon.svg' width='16' height='16'> Add Pet 
       </div>
       "
             }
@@ -1517,9 +1675,10 @@ server <- function(input, output, session) {
     left: 305px;           /* adjust: GIF width + some spacing */
     z-index: 1001;          /* above background but below the GIF if needed */
     padding: 5px 12px;
-    border-radius: 10px;
-    background-color: #f39c12;
+    background-color: #F46A6A;
     color: white;
+    font-family: EpicPro;
+    letter-spacing: 1px;
     border: none;
     cursor: pointer;
   "
@@ -1614,20 +1773,7 @@ server <- function(input, output, session) {
                   "
                   ),
                   
-                  tags$span(
-                    id = "notif_count",
-                    textOutput("notif_count_text"),
-                    class = "badge bg-danger",
-                    style = "
-                    position:absolute;
-                    top:5px;
-                    right:2px;
-                    background-color:red;
-                    font-size:11px;
-                    padding:3px 6px;
-                    border-radius:50%;
-                  "
-                  )
+                  uiOutput("notif_count_ui")
                 )
               )
               ,
@@ -1686,16 +1832,18 @@ server <- function(input, output, session) {
     if (logged_in()) main_ui else login_ui
   })
   
-  
-  # 4️⃣ Login button
+  # Login button
   observeEvent(input$login_btn, {
-    if (input$login_user == USERNAME &&
-        input$login_pass == PASSWORD) {
+    
+    # Trim whitespace
+    login_user <- trimws(input$login_user)
+    login_pass <- trimws(input$login_pass)
+    
+    if (login_user == USERNAME && login_pass == PASSWORD) {
       
       logged_in(TRUE)
       shinyjs::runjs("localStorage.setItem('logged_in', 'true');")
       
-      # Optionally, show a success notification
       showNotification(
         HTML(
           paste0(
@@ -1711,8 +1859,9 @@ server <- function(input, output, session) {
         ),
         type = "message"
       )
+      
     } else {
-      # Show login error as a notification
+      
       showNotification(
         HTML(
           paste0(
@@ -1727,12 +1876,29 @@ server <- function(input, output, session) {
           )
         ),
         type = "error"
-      )    }
+      )
+      
+    }
   })
   
-  
-  # 5️⃣ Logout button
   observeEvent(input$logout_btn, {
+    
+    showModal(      
+      tags$div(
+      id = "modal3",
+      modalDialog(
+      title = "Confirm Logout",
+      "Are you sure you want to log out?",
+      easyClose = TRUE,      # allows clicking outside to close
+      footer = tagList(
+        modalButton("Cancel"),  # just closes the modal
+        actionButton("confirm_logout", "Logout", class = "btn-delete2")
+      )
+    )))
+  })
+  # 5️⃣ Logout button
+  observeEvent(input$confirm_logout, {
+    removeModal()  # close the modal
     logged_in(FALSE)
     shinyjs::runjs("localStorage.removeItem('logged_in');")
   })
@@ -1990,7 +2156,22 @@ observe({
           ),
           footer = tagList(
             actionButton("discard_crop", "Discard", class = "btn btn-secondary"),
-            actionButton("confirm_crop", "Save", class = "btn-add")
+            actionButton(
+              "confirm_crop",
+              label = tagList(
+                tags$img(
+                  src = "icons/upload.svg",
+                  width = "16px",
+                  height = "16px",
+                  style = "vertical-align:middle; margin-right:3px; margin-bottom: 2px;"
+                ),
+                "Upload"  # fixed label
+              ),
+              class = "btn-add",
+              style = "background: linear-gradient(to right, #fcd34d, #f97316);
+           color:white; border:none; padding:6px 12px;
+           display:inline-flex; align-items:center; gap:3px;"
+            )
           ),
           size = "l",      # large modal for more width
           easyClose = FALSE
@@ -2291,15 +2472,33 @@ observe({
   # ---------- DELETE PET ----------
   observeEvent(input$delete_id, {
     req(input$delete_id)
-    showModal(modalDialog(
+    showModal(      
+      tags$div(
+      id = "modal3",
+      modalDialog(
       title = "Confirm Delete",
       "Are you sure you want to delete this pet?",
+      easyClose = TRUE,
       footer = tagList(
         modalButton("Cancel"),
-        actionButton("confirm_delete", "Delete", class = "btn-delete")
+        actionButton(
+          "confirm_delete",
+          label = tagList(
+            tags$img(
+              src = "icons/delete.svg",
+              width = "16px",
+              height = "16px",
+              style = "vertical-align:middle; margin-right:3px; margin-bottom: 3px;"
+            ),
+            "Delete"  # fixed label
+          ),
+          class = "btn-delete2"
+        )
       )
     ))
+    )
   })
+  
   
   observeEvent(input$confirm_delete, {
     req(input$delete_id)
