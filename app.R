@@ -2,10 +2,12 @@ source("packages.R")
 
 # --- SQLite connection ---
 db <- dbConnect(RSQLite::SQLite(), "mypetshop.sqlite")
+dbExecute(db, "PRAGMA foreign_keys = ON;")
+
 
 dbExecute(db, "
 CREATE TABLE IF NOT EXISTS pets (
-  id INTEGER PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT,
   type TEXT,
   age INTEGER,
@@ -555,6 +557,12 @@ ul.nav.nav-tabs > li.active > a {
       opacity: 1;
     }
     
+    .shiny-notification-warning {
+      background: linear-gradient(135deg, #f97316, #fb923c);
+      color: white;
+      opacity: 1;
+    }
+    
     .shiny-notification-close {
       display: none !important;
     }
@@ -649,7 +657,52 @@ ul.nav.nav-tabs > li.active > a {
   font-family: EpicPro;
   letter-spacing: 1px;
 }
-  
+
+.row-select {
+  display: none;  /* hide real checkbox */
+}
+
+/* Custom checkbox container */
+.custom-checkbox {
+  display: inline-flex;          /* inline with text, flex for centering */
+  align-items: center;           /* vertical center */
+  justify-content: center;       /* horizontal center */
+  width: 17px;
+  height: 17px;
+  border: 2px solid #E58B2B;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;               /* size of check */
+  color: white;                  /* checkmark color */
+  line-height: 1;
+  vertical-align: middle;        /* aligns with row text */
+  user-select: none;
+  position: relative;
+}
+
+/* Use pseudo-element to show checkmark */
+.custom-checkbox::after {
+  content: '';                   /* empty by default */
+  font-size: 14px;
+  font-weight: bold;
+  color: white;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%); /* perfectly center */
+}
+
+/* Show check and change background when checked */
+.row-select:checked + .custom-checkbox {
+  background: #E58B2B;
+}
+
+.row-select:checked + .custom-checkbox::after {
+  content: '✓';                 /* the checkmark */
+}
+
+
 "))
     
   ),
@@ -780,6 +833,67 @@ document.addEventListener('click', function (e) {
       Shiny.setInputValue('close_notif_dropdown', Math.random());
     }
   });
+// global selection memory
+window.checkedPets = [];
+
+// update checked IDs whenever a checkbox changes
+function updateCheckedPets() {
+  var id = $(this).data('id');
+  if ($(this).is(':checked')) {
+    if (!window.checkedPets.includes(id)) {
+      window.checkedPets.push(id);
+    }
+  } else {
+    window.checkedPets = window.checkedPets.filter(function(x) { return x !== id; });
+  }
+  Shiny.setInputValue('checked_pet_ids', window.checkedPets, {priority: 'event'});
+}
+
+// checkbox change
+$(document).on('change', '.row-select', updateCheckedPets);
+
+// re-run after DT redraw
+$(document).on('draw.dt', '#pet_table', function () {
+  var $checkboxes = $('.row-select');
+  var $wrappers = $('.custom-checkbox-wrapper');
+
+  if ($('#bulk_action_bar').is(':visible')) {
+    $wrappers.show();   // 👈 show the VISUAL checkbox
+  } else {
+    $checkboxes.prop('checked', false);
+    $wrappers.hide();   // 👈 hide the VISUAL checkbox
+
+    window.checkedPets = [];
+    Shiny.setInputValue('checked_pet_ids', [], { priority: 'event' });
+  }
+
+  // restore checked state
+  $checkboxes.each(function () {
+    var id = $(this).data('id');
+    if (window.checkedPets.includes(id)) {
+      $(this).prop('checked', true);
+    }
+  });
+
+  Shiny.setInputValue('checked_pet_ids', window.checkedPets, { priority: 'event' });
+});
+
+
+// listen for Shiny events to clear memory
+$(document).on('shiny:inputchanged', function(e) {
+  if (e.name === 'reload_pets') {
+    // clear all selections on reload
+    window.checkedPets = [];
+    Shiny.setInputValue('checked_pet_ids', [], {priority: 'event'});
+  }
+  if (e.name === 'delete_id') {
+    // remove deleted pet from memory
+    var deletedId = e.value;
+    window.checkedPets = window.checkedPets.filter(function(x) { return x !== deletedId; });
+    Shiny.setInputValue('checked_pet_ids', window.checkedPets, {priority: 'event'});
+  }
+});
+
 
 ")),
   uiOutput("page")
@@ -1205,7 +1319,7 @@ server <- function(input, output, session) {
       id = "notif_dropdown",
       style = paste0("
       position:absolute;
-      left:280px;
+      left:265px;
       top:65px;
       white-space: nowrap;
       overflow: hidden;
@@ -1227,6 +1341,11 @@ server <- function(input, output, session) {
     notif_visible(FALSE)
   })
   
+  output$selected_count <- renderText({
+    n <- length(input$checked_pet_ids %||% character(0))
+    paste(n, "selected")
+  })
+  
   # ---------- PET TABLE ----------
   output$pet_table <- renderDT({
     input$reload_pets
@@ -1242,6 +1361,12 @@ server <- function(input, output, session) {
       ) %>%
       left_join(pet_additional_infos_data(), by = c("id" = "pet_id")) %>%
       mutate(
+        Select = paste0(
+          '<label class="custom-checkbox-wrapper">',
+          '<input type="checkbox" class="row-select" data-id="', id, '">',
+          '<span class="custom-checkbox"></span>',
+          '</label>'
+        ),
         # ---- PET ID ----
         PetID = paste0(
           '<span style="letter-spacing:1px; font-family:PSemiBold; color:#555;">',
@@ -1318,6 +1443,7 @@ server <- function(input, output, session) {
         )
       ) %>%
       select(
+        Select,
         PetID,       # <-- added Pet ID column
         PetProfile,
         PetName,
@@ -1331,6 +1457,7 @@ server <- function(input, output, session) {
       )   } else {
         # 👇 Only here we force empty table
         filtered_data <- data.frame(
+          Select = character(),
           PetID = character(),
           PetProfile = character(),
           PetName = character(),
@@ -1352,6 +1479,7 @@ server <- function(input, output, session) {
       rownames = FALSE,
       selection = "none",
       colnames = c(
+        "",
         "Pet ID",    # <-- display Pet ID
         "Profile",
         "PetName",
@@ -1365,13 +1493,14 @@ server <- function(input, output, session) {
       ),
       options = list(
         columnDefs = list(
-          list(visible = FALSE, targets = c(2, 8)),          # hide AddedOn_raw only
-          list(orderable = TRUE, targets = 1, orderData = 2), # Profile → PetName
-          list(orderable = TRUE, targets = 7, orderData = 8), # Added On → raw datetime
-          list(orderable = FALSE, targets = 9),
-          list(className = "dt-center", targets = 9)
+          list(targets = 0, visible = TRUE, orderable = FALSE), 
+          list(visible = FALSE, targets = c(3, 9)),          # hide AddedOn_raw only
+          list(orderable = TRUE, targets = 2, orderData = 3), # Profile → PetName
+          list(orderable = TRUE, targets = 8, orderData = 9), # Added On → raw datetime
+          list(orderable = FALSE, targets = 10),
+          list(className = "dt-center", targets = 10)
         ),
-        order = list(list(8, "desc")),  # newest first
+        order = list(list(9, "desc")),  # newest first
         language = list(
           zeroRecords = HTML(
             " <div style='width:100vw; margin-left:calc(-50vw + 50%); padding:30px; text-align:center; background-color:white;'> 
@@ -1408,7 +1537,9 @@ server <- function(input, output, session) {
         )
       )
     )
+    
   })
+  bulk_mode <- reactiveVal(FALSE)
   
   notif_data <- reactiveVal(
     tibble(
@@ -1673,7 +1804,7 @@ server <- function(input, output, session) {
     position: absolute;
     top: 165px;              /* same vertical position as the GIF */
     left: 305px;           /* adjust: GIF width + some spacing */
-    z-index: 1001;          /* above background but below the GIF if needed */
+    z-index: 999;          /* above background but below the GIF if needed */
     padding: 5px 12px;
     background-color: #F46A6A;
     color: white;
@@ -1727,13 +1858,40 @@ server <- function(input, output, session) {
               class = "sidebar-panel",
               
               div(
-                style = "display:flex; align-items:center; gap:10px;",
+                style = "display:flex; align-items:center; gap:10px; width:100%;",
                 
                 actionButton(
                   "open_add",
-                  "Add Pet",
-                  icon = icon("plus"),
-                  class = "btn-add"
+                  label = NULL,
+                  icon = tags$img(
+                    src = "icons/add.svg",
+                    width = "25px",
+                    height = "25px"
+                  ),
+                  style = "
+                  border-radius:10px;
+                  background: linear-gradient(135deg, #28a745, #85e085);
+                  border:2px solid white;
+                  cursor:pointer;
+                  padding: 3px 5px;
+                "
+                ),
+                
+                actionButton(
+                  "toggle_bulk_delete",
+                  label = NULL,
+                  icon = tags$img(
+                    src = "icons/selectdelete.svg",
+                    width = "25px",
+                    height = "25px"
+                  ),
+                  style = "
+                  border-radius:10px;
+                  background: linear-gradient(135deg, #e74c3c, #ff6b6b);
+                  border:2px solid white;
+                  cursor:pointer;
+                  padding: 3px 5px;
+                "
                 ),
 
                 
@@ -1755,28 +1913,22 @@ server <- function(input, output, session) {
                 ),
                 
                 div(
-                  style = "position:relative;",
+                  style = "margin-left:auto; position: relative; display: inline-block;",
                   
                   actionButton(
                     "notif_icon",
                     label = NULL,
-                    icon = tags$img(
-                      src = "icons/lowstock.svg",
-                      width = "45px",
-                      height = "45px"
-                    ),
+                    icon = tags$img(src = "icons/lowstock.svg", width = "45px", height = "45px"),
                     style = "
-                    border-radius:50%;
-                    background:transparent;
-                    border:none;
-                    margin-left: 30px;
-                  "
+                              border-radius:50%;
+                              background:transparent;
+                              border:none;
+                            "
                   ),
                   
                   uiOutput("notif_count_ui")
                 )
-              )
-              ,
+              ),
               
               uiOutput("notif_dropdown"),
               hr(),
@@ -1803,6 +1955,96 @@ server <- function(input, output, session) {
               )
             )
           ),
+          
+          div(
+            id = "bulk_action_bar",
+            style = "
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    font-family: PMedium;
+    transform: translateX(-50%);
+    background: white;
+    padding: 12px 20px;
+    display: none;
+    z-index: 1000;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.18);
+    border-radius: 999px;
+    border: 3px solid #e74c3c;
+    min-width: auto;
+  ",
+            
+            fluidRow(
+              style = "display:flex; align-items:center; gap:8px; white-space:nowrap;",
+              
+              column(
+                width = 3,
+                textOutput("selected_count")
+              ),
+              
+              column(
+                width = 4,
+                actionButton("select_all_rows", 
+                             "Select all",
+                             icon = tags$img(
+                               src = "icons/selectall.svg",
+                               width = "18px",
+                               height = "18px"
+                             ),
+                             style = "
+                  border-radius:10px;
+                  background: linear-gradient(to right, #FFC629, #FFD700);
+                  cursor:pointer;
+                  border:none;
+                  color: white;
+                "
+                ),
+                actionButton("clear_selected", 
+                             "Clear",
+                             style = "
+                  border-radius:10px;
+                  background: white;
+                  border:2px solid #FFC629;
+                  cursor:pointer;
+                  padding: 4px 12px;
+                  color: #FFC629;
+                "
+                )
+              ),
+              
+              column(
+                width = 4,
+                actionButton(
+                  "confirm_bulk_delete",
+                  "Delete selected",
+                  icon = tags$img(
+                    src = "icons/selectdelete.svg",
+                    width = "18px",
+                    height = "18px"
+                  ),
+                  style = "
+                  border-radius:10px;
+                  background: linear-gradient(135deg, #e74c3c, #ff6b6b);
+                  cursor:pointer;
+                  border:none;
+                  color: white;
+                "
+                )
+              ),
+              
+              column(
+                width = 1,
+                actionButton(
+                  "close_bulk_bar",
+                  label = NULL,
+                  icon = icon("times"),
+                  class = "btn btn-link",
+                  style = "font-size:20px; color:#555; padding:0;"
+                )
+              )
+            )
+          )
+          ,
           
           # --- Table on Right ---
           column(
@@ -1902,6 +2144,158 @@ server <- function(input, output, session) {
     logged_in(FALSE)
     shinyjs::runjs("localStorage.removeItem('logged_in');")
   })
+  
+  # ===============================
+  # BULK SELECTION & DELETE LOGIC
+  # ===============================
+  
+  # Select all rows
+  observeEvent(input$select_all_rows, {
+    shinyjs::runjs("
+    $('.row-select').prop('checked', true).trigger('change');
+  ")
+  })
+  
+  # Clear selected rows
+  observeEvent(input$clear_selected, {
+    shinyjs::runjs("
+    $('.row-select').prop('checked', false).trigger('change');
+  ")
+  })
+  
+  # Toggle bulk delete mode
+  observeEvent(input$toggle_bulk_delete, {
+    bulk_mode(!bulk_mode())
+    
+    if (bulk_mode()) {
+      shinyjs::show('bulk_action_bar')
+      shinyjs::runjs("
+      $('.custom-checkbox-wrapper').show();
+    ")
+    } else {
+      shinyjs::hide('bulk_action_bar')
+      shinyjs::runjs("
+      $('.row-select').prop('checked', false).trigger('change');
+      $('.custom-checkbox-wrapper').hide();
+    ")
+    }
+  })
+  
+  # Show confirmation modal
+  observeEvent(input$confirm_bulk_delete, {
+    ids <- input$checked_pet_ids
+    
+    if (length(ids) > 0) {
+      showModal(
+        tags$div(
+          id = "modal3",
+        modalDialog(
+          title = 'Confirm deletion',
+          paste('Are you sure you want to delete', length(ids), 'selected pet(s)?'),
+          footer = tagList(
+            modalButton('Cancel'),
+            actionButton(
+              'confirm_delete_yes',
+              'Yes, delete',
+              class = 'btn-delete2'
+            )
+          )
+        )
+        )
+      )
+    } else {
+      showNotification(
+        HTML(
+          paste0(
+            '<div style="display:flex; align-items:center; gap:7px;">',
+            '<img src="icons/warning.svg" style="width:17px;height:17px;">',
+            '<span style="flex:1; font-family:PSemiBold;">Please select pets to delete!</span>',
+            '<button onclick="$(this).closest(\'.shiny-notification\').remove()" ',
+            'style="background:none;border:none;cursor:pointer;margin-bottom:2px;">',
+            '<img src="icons/close.svg" style="width:12px;height:12px;">',
+            '</button>',
+            '</div>'
+          )
+        ),
+        type = "warning"
+      )
+    }
+  })
+  
+  # Delete after confirmation
+  observeEvent(input$confirm_delete_yes, {
+    ids <- input$checked_pet_ids
+    req(length(ids) > 0)
+    
+    dbExecute(
+      db,
+      paste0(
+        'DELETE FROM pets WHERE id IN (',
+        paste(rep('?', length(ids)), collapse = ','),
+        ')'
+      ),
+      params = as.list(ids)
+    )
+    
+    showNotification(
+      HTML(
+        paste0(
+          '<div style="display:flex; align-items:center; gap:7px;">',
+          '<img src="icons/check.svg" style="width:17px;height:17px;">',
+          '<span style="flex:1; font-family:PSemiBold;">Selected pet(s) deleted successfully!</span>',
+          '<button onclick="$(this).closest(\'.shiny-notification\').remove()" ',
+          'style="background:none;border:none;cursor:pointer;margin-bottom:2px;">',
+          '<img src="icons/close.svg" style="width:12px;height:12px;">',
+          '</button>',
+          '</div>'
+        )
+      ),
+      type = "message"
+    )
+    
+    removeModal()
+    bulk_mode(FALSE)
+    shinyjs::hide('bulk_action_bar')
+    
+    shinyjs::runjs("
+    window.checkedPets = [];
+    Shiny.setInputValue('checked_pet_ids', [], {priority:'event'});
+    $('.row-select').prop('checked', false);
+    $('.custom-checkbox-wrapper').hide();
+    Shiny.setInputValue('reload_pets', Math.random(), {priority:'event'});
+  ")
+  })
+  
+  # Close bulk bar manually
+  observeEvent(input$close_bulk_bar, {
+    bulk_mode(FALSE)
+    shinyjs::hide('bulk_action_bar')
+    
+    shinyjs::runjs("
+    $('.row-select').prop('checked', false).trigger('change');
+    $('.custom-checkbox-wrapper').hide();
+  ")
+  })
+  
+  # Auto-exit bulk mode when navigating elsewhere
+  observeEvent(
+    list(
+      input$delete_id,
+      input$edit_id,
+      input$open_add,
+      input$logout_btn
+    ),
+    {
+      bulk_mode(FALSE)
+      shinyjs::hide('bulk_action_bar')
+      
+      shinyjs::runjs("
+      $('.row-select').prop('checked', false).trigger('change');
+      $('.custom-checkbox-wrapper').hide();
+    ")
+    },
+    ignoreInit = TRUE
+  )
   
   # ---------- ADD PET MODAL ----------
   showAddPetModal <- function(cropped = NULL) {
