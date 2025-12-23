@@ -202,6 +202,14 @@ ui <- fluidPage(
     padding: 8px 10px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
   }
+  
+  .btn-update2 {
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    padding: 8px 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  }
 
 
   table.dataTable.stripe tbody tr.odd {
@@ -456,7 +464,7 @@ ul.nav.nav-tabs > li.active > a {
     }
 
   
-    #modal1 .modal-header, #modal2 .modal-header, #modal3 .modal-header {
+    #modal1 .modal-header, #modal2 .modal-header, #modal3 .modal-header, #modal4 .modal-header {
       background: linear-gradient(to left, #fcd34d, #f97316);
       padding: 15px 20px; 
       border-top-left-radius: 12px;
@@ -466,8 +474,12 @@ ul.nav.nav-tabs > li.active > a {
     #modal3 .modal-header {
       background: #F46A6A;
     }
+    
+    #modal4 .modal-header {
+      background: #3b82f6;
+    }
   
-    #modal1 .modal-header .modal-title, #modal2 .modal-header .modal-title, #modal3 .modal-header .modal-title {
+    #modal1 .modal-header .modal-title, #modal2 .modal-header .modal-title, #modal3 .modal-header .modal-title, #modal4 .modal-header .modal-title {
       font-size: 2.2rem;      /* adjust as needed */
       font-family: 'EpicPro';
       letter-spacing: 1px;
@@ -479,7 +491,7 @@ ul.nav.nav-tabs > li.active > a {
 
     }
   
-    #modal1 .modal-content, #modal2 .modal-content, #modal3 .modal-content {
+    #modal1 .modal-content, #modal2 .modal-content, #modal3 .modal-content, #modal4 .modal-content {
       border-radius: 12px;
       }
     
@@ -667,13 +679,13 @@ ul.nav.nav-tabs > li.active > a {
   display: inline-flex;          /* inline with text, flex for centering */
   align-items: center;           /* vertical center */
   justify-content: center;       /* horizontal center */
-  width: 17px;
-  height: 17px;
+  width: 15px;
+  height: 15px;
   border: 2px solid #E58B2B;
   border-radius: 4px;
   background: white;
   cursor: pointer;
-  font-size: 14px;               /* size of check */
+  font-size: 5px;               /* size of check */
   color: white;                  /* checkmark color */
   line-height: 1;
   vertical-align: middle;        /* aligns with row text */
@@ -1346,6 +1358,10 @@ server <- function(input, output, session) {
     paste(n, "selected")
   })
   
+  output$selected_count_purchase <- renderText({
+    paste(length(input$checked_pet_ids), "selected")
+  })
+  
   # ---------- PET TABLE ----------
   output$pet_table <- renderDT({
     input$reload_pets
@@ -1539,7 +1555,8 @@ server <- function(input, output, session) {
     )
     
   })
-  bulk_mode <- reactiveVal(FALSE)
+  bulk_delete_mode   <- reactiveVal(FALSE)
+  bulk_purchase_mode <- reactiveVal(FALSE)
   
   notif_data <- reactiveVal(
     tibble(
@@ -1893,6 +1910,24 @@ server <- function(input, output, session) {
                   padding: 3px 5px;
                 "
                 ),
+                
+                actionButton(
+                  "toggle_bulk_purchase",
+                  label = NULL,
+                  icon = tags$img(
+                    src = "icons/selectedit.svg",
+                    width = "25px",
+                    height = "25px"
+                  ),
+                  style = "
+                    border-radius:10px;
+                    background: linear-gradient(135deg, #3b82f6, #60a5fa);
+                    border:2px solid white;
+                    cursor:pointer;
+                    padding: 3px 5px;
+                  "
+                ),
+                
 
                 
                 actionButton(
@@ -2043,8 +2078,91 @@ server <- function(input, output, session) {
                 )
               )
             )
-          )
-          ,
+          ),
+          
+          div(
+            id = "bulk_purchase_bar",
+            style = "
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    font-family: PMedium;
+    transform: translateX(-50%);
+    background: white;
+    padding: 12px 20px;
+    display: none;
+    z-index: 1000;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.18);
+    border-radius: 999px;
+    border: 3px solid #3b82f6;
+  ",
+            fluidRow(
+              style = "display:flex; align-items:center; gap:8px; white-space:nowrap;",
+              
+              column(3, textOutput("selected_count_purchase")),
+              
+              column(
+                width = 4,
+                actionButton("select_all_rows_purchase", 
+                             "Select all",
+                             icon = tags$img(
+                               src = "icons/selectall.svg",
+                               width = "18px",
+                               height = "18px"
+                             ),
+                             style = "
+                  border-radius:10px;
+                  background: linear-gradient(to right, #FFC629, #FFD700);
+                  cursor:pointer;
+                  border:none;
+                  color: white;
+                "
+                ),
+                actionButton("clear_selected_purchase", 
+                             "Clear",
+                             style = "
+                  border-radius:10px;
+                  background: white;
+                  border:2px solid #FFC629;
+                  cursor:pointer;
+                  padding: 4px 12px;
+                  color: #FFC629;
+                "
+                )
+              ),
+              
+              column(
+                4,
+                actionButton(
+                  "confirm_bulk_purchase",
+                  "Mark as Purchased",
+                  icon = tags$img(
+                    src = "icons/selectedit.svg",
+                    width = "18px",
+                    height = "18px"
+                  ),
+                  style = "
+                    border-radius:10px;
+                    background: linear-gradient(135deg, #3b82f6, #60a5fa);
+                    border:none;
+                    color:white;
+                  "
+                )
+              ),
+              
+              column(
+                1,
+                actionButton(
+                  "close_bulk_purchase",
+                  label = NULL,
+                  icon = icon("times"),
+                  class = "btn btn-link",
+                  style = "font-size:20px; color:#555; padding:0;"
+                )
+              )
+            )
+          ),
+          
           
           # --- Table on Right ---
           column(
@@ -2163,17 +2281,51 @@ server <- function(input, output, session) {
   ")
   })
   
-  # Toggle bulk delete mode
+  observeEvent(input$select_all_rows_purchase, {
+    shinyjs::runjs("$('.row-select').prop('checked', true).trigger('change');")
+  })
+  
+  observeEvent(input$clear_selected_purchase, {
+    shinyjs::runjs("$('.row-select').prop('checked', false).trigger('change');")
+  })
+  
   observeEvent(input$toggle_bulk_delete, {
-    bulk_mode(!bulk_mode())
+    bulk_delete_mode(!bulk_delete_mode())
+    bulk_purchase_mode(FALSE)   # 🔴 force purchase OFF
     
-    if (bulk_mode()) {
-      shinyjs::show('bulk_action_bar')
+    if (bulk_delete_mode()) {
+      shinyjs::hide("bulk_purchase_bar")
+      shinyjs::show("bulk_action_bar")
+      
       shinyjs::runjs("
       $('.custom-checkbox-wrapper').show();
     ")
     } else {
-      shinyjs::hide('bulk_action_bar')
+      shinyjs::hide("bulk_action_bar")
+      
+      shinyjs::runjs("
+      $('.row-select').prop('checked', false).trigger('change');
+      $('.custom-checkbox-wrapper').hide();
+    ")
+    }
+  })
+  
+  
+  
+  observeEvent(input$toggle_bulk_purchase, {
+    bulk_purchase_mode(!bulk_purchase_mode())
+    bulk_delete_mode(FALSE)   # 🔴 force delete OFF
+    
+    if (bulk_purchase_mode()) {
+      shinyjs::hide("bulk_action_bar")
+      shinyjs::show("bulk_purchase_bar")
+      
+      shinyjs::runjs("
+      $('.custom-checkbox-wrapper').show();
+    ")
+    } else {
+      shinyjs::hide("bulk_purchase_bar")
+      
       shinyjs::runjs("
       $('.row-select').prop('checked', false).trigger('change');
       $('.custom-checkbox-wrapper').hide();
@@ -2183,27 +2335,34 @@ server <- function(input, output, session) {
   
   # Show confirmation modal
   observeEvent(input$confirm_bulk_delete, {
+    
+    # Only allow if delete mode is active
+    req(bulk_delete_mode())
+    
     ids <- input$checked_pet_ids
     
     if (length(ids) > 0) {
+      
       showModal(
         tags$div(
           id = "modal3",
-        modalDialog(
-          title = 'Confirm deletion',
-          paste('Are you sure you want to delete', length(ids), 'selected pet(s)?'),
-          footer = tagList(
-            modalButton('Cancel'),
-            actionButton(
-              'confirm_delete_yes',
-              'Yes, delete',
-              class = 'btn-delete2'
+          modalDialog(
+            title = "Confirm deletion",
+            paste("Are you sure you want to delete", length(ids), "selected pet(s)?"),
+            footer = tagList(
+              modalButton("Cancel"),
+              actionButton(
+                "confirm_delete_yes",
+                "Yes, delete",
+                class = "btn-delete2"
+              )
             )
           )
         )
-        )
       )
+      
     } else {
+      
       showNotification(
         HTML(
           paste0(
@@ -2222,21 +2381,72 @@ server <- function(input, output, session) {
     }
   })
   
-  # Delete after confirmation
+  observeEvent(input$confirm_bulk_purchase, {
+    
+    # Only allow if purchase mode is active
+    req(bulk_purchase_mode())
+    
+    ids <- input$checked_pet_ids
+    
+    if (length(ids) == 0) {
+      
+      showNotification(
+        HTML(
+          paste0(
+            '<div style="display:flex; align-items:center; gap:7px;">',
+            '<img src="icons/warning.svg" style="width:17px;height:17px;">',
+            '<span style="flex:1; font-family:PSemiBold;">Please select pets to mark as Purchased!</span>',
+            '<button onclick="$(this).closest(\'.shiny-notification\').remove()" ',
+            'style="background:none;border:none;cursor:pointer;margin-bottom:2px;">',
+            '<img src="icons/close.svg" style="width:12px;height:12px;">',
+            '</button>',
+            '</div>'
+          )
+        ),
+        type = "warning"
+      )
+      return()
+    }
+    
+    showModal(
+      tags$div(
+        id = "modal4",
+      modalDialog(
+        title = "Confirm update",
+        paste("Are you sure you want to mark ", length(ids), "selected pet(s) as Purchased?"),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton(
+            "confirm_purchase_yes",
+            "Yes, confirm",
+            class = "btn-update2"
+          )
+        )
+      )
+    )
+    )
+  })
+  
   observeEvent(input$confirm_delete_yes, {
+    
+    # Safety guard: only run in delete mode
+    req(bulk_delete_mode())
+    
     ids <- input$checked_pet_ids
     req(length(ids) > 0)
     
+    # ---- Delete from DB ----
     dbExecute(
       db,
       paste0(
-        'DELETE FROM pets WHERE id IN (',
-        paste(rep('?', length(ids)), collapse = ','),
-        ')'
+        "DELETE FROM pets WHERE id IN (",
+        paste(rep("?", length(ids)), collapse = ","),
+        ")"
       ),
       params = as.list(ids)
     )
     
+    # ---- Success notification ----
     showNotification(
       HTML(
         paste0(
@@ -2253,31 +2463,110 @@ server <- function(input, output, session) {
       type = "message"
     )
     
+    # ---- Reset UI & state ----
     removeModal()
-    bulk_mode(FALSE)
-    shinyjs::hide('bulk_action_bar')
+    
+    bulk_delete_mode(FALSE)
+    bulk_purchase_mode(FALSE)
+    
+    shinyjs::hide("bulk_action_bar")
+    shinyjs::hide("bulk_purchase_bar")
     
     shinyjs::runjs("
     window.checkedPets = [];
-    Shiny.setInputValue('checked_pet_ids', [], {priority:'event'});
+    Shiny.setInputValue('checked_pet_ids', [], { priority:'event' });
     $('.row-select').prop('checked', false);
     $('.custom-checkbox-wrapper').hide();
-    Shiny.setInputValue('reload_pets', Math.random(), {priority:'event'});
+    Shiny.setInputValue('reload_pets', Math.random(), { priority:'event' });
   ")
   })
   
-  # Close bulk bar manually
-  observeEvent(input$close_bulk_bar, {
-    bulk_mode(FALSE)
-    shinyjs::hide('bulk_action_bar')
+  observeEvent(input$confirm_purchase_yes, {
+    
+    # Safety guard: only run in purchase mode
+    req(bulk_purchase_mode())
+    
+    ids <- input$checked_pet_ids
+    req(length(ids) > 0)
+    
+    # ---- Update DB ----
+    dbExecute(
+      db,
+      paste0(
+        "UPDATE pets SET status = 'Purchased' WHERE id IN (",
+        paste(rep("?", length(ids)), collapse = ","),
+        ")"
+      ),
+      params = as.list(ids)
+    )
+    
+    # ---- Success notification ----
+    showNotification(
+      HTML(
+        paste0(
+          '<div style="display:flex; align-items:center; gap:7px;">',
+          '<img src="icons/check.svg" style="width:17px;height:17px;">',
+          '<span style="flex:1; font-family:PSemiBold;">Selected pet(s) marked as Purchased!</span>',
+          '<button onclick="$(this).closest(\'.shiny-notification\').remove()" ',
+          'style="background:none;border:none;cursor:pointer;margin-bottom:2px;">',
+          '<img src="icons/close.svg" style="width:12px;height:12px;">',
+          '</button>',
+          '</div>'
+        )
+      ),
+      type = "message"
+    )
+    
+    # ---- Reset UI & state ----
+    removeModal()
+    
+    bulk_purchase_mode(FALSE)
+    bulk_delete_mode(FALSE)
+    
+    shinyjs::hide("bulk_purchase_bar")
+    shinyjs::hide("bulk_action_bar")
     
     shinyjs::runjs("
+    window.checkedPets = [];
+    Shiny.setInputValue('checked_pet_ids', [], { priority:'event' });
+    $('.row-select').prop('checked', false);
+    $('.custom-checkbox-wrapper').hide();
+    Shiny.setInputValue('reload_pets', Math.random(), { priority:'event' });
+  ")
+  })
+  
+  observeEvent(input$close_bulk_bar, {
+    
+    bulk_delete_mode(FALSE)
+    bulk_purchase_mode(FALSE)
+    
+    shinyjs::hide("bulk_action_bar")
+    shinyjs::hide("bulk_purchase_bar")
+    
+    shinyjs::runjs("
+    window.checkedPets = [];
+    Shiny.setInputValue('checked_pet_ids', [], { priority:'event' });
     $('.row-select').prop('checked', false).trigger('change');
     $('.custom-checkbox-wrapper').hide();
   ")
   })
   
-  # Auto-exit bulk mode when navigating elsewhere
+  observeEvent(input$close_bulk_purchase, {
+    
+    bulk_purchase_mode(FALSE)
+    bulk_delete_mode(FALSE)
+    
+    shinyjs::hide("bulk_purchase_bar")
+    shinyjs::hide("bulk_action_bar")
+    
+    shinyjs::runjs("
+    window.checkedPets = [];
+    Shiny.setInputValue('checked_pet_ids', [], { priority:'event' });
+    $('.row-select').prop('checked', false).trigger('change');
+    $('.custom-checkbox-wrapper').hide();
+  ")
+  })
+
   observeEvent(
     list(
       input$delete_id,
@@ -2286,16 +2575,25 @@ server <- function(input, output, session) {
       input$logout_btn
     ),
     {
-      bulk_mode(FALSE)
-      shinyjs::hide('bulk_action_bar')
+      # turn off BOTH modes
+      bulk_delete_mode(FALSE)
+      bulk_purchase_mode(FALSE)
       
+      # hide BOTH bars
+      shinyjs::hide("bulk_action_bar")
+      shinyjs::hide("bulk_purchase_bar")
+      
+      # reset selection + UI
       shinyjs::runjs("
+      window.checkedPets = [];
+      Shiny.setInputValue('checked_pet_ids', [], { priority:'event' });
       $('.row-select').prop('checked', false).trigger('change');
       $('.custom-checkbox-wrapper').hide();
     ")
     },
     ignoreInit = TRUE
   )
+  
   
   # ---------- ADD PET MODAL ----------
   showAddPetModal <- function(cropped = NULL) {
