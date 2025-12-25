@@ -714,6 +714,11 @@ ul.nav.nav-tabs > li.active > a {
   content: '✓';                 /* the checkmark */
 }
 
+label[for='login_user'],
+label[for='login_pass'] {
+  font-family: PMedium;
+}
+
 
 "))
     
